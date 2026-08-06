@@ -1,0 +1,139 @@
+// Hand-authored to match supabase/migrations/0001_initial.sql.
+// Replace with `supabase gen types typescript` output once a project is linked.
+
+export type CitizenshipStatus =
+  | 'us_citizen'
+  | 'permanent_resident'
+  | 'f1_visa'
+  | 'other_visa'
+  | 'prefer_not_to_say'
+
+export type MatchStatus = 'suggested' | 'dismissed' | 'drafting' | 'contacted'
+
+export type DealStatus =
+  | 'draft'
+  | 'sent'
+  | 'reply_received'
+  | 'negotiating'
+  | 'agreed'
+  | 'closed'
+  | 'dead'
+
+export type MessageDirection = 'outbound_draft' | 'inbound_pasted'
+
+export type DiscoveryRunStatus = 'queued' | 'running' | 'completed' | 'failed'
+
+export interface Profile {
+  id: string
+  full_name: string
+  school: string | null
+  sport: string | null
+  division: string | null
+  instagram_followers: number | null
+  tiktok_followers: number | null
+  other_followers: number | null
+  citizenship_status: CitizenshipStatus | null
+  visa_guidance_shown_at: string | null
+  onboarding_completed_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface Interview {
+  id: string
+  athlete_id: string
+  interests: string[]
+  brands_used: string[]
+  category_tags: string[]
+  deal_preferences: Record<string, unknown>
+  raw_answers: Record<string, unknown> | null
+  created_at: string
+  updated_at: string
+}
+
+export interface Brand {
+  id: string
+  domain: string
+  name: string
+  description: string | null
+  categories: string[]
+  contact_email: string | null
+  source_urls: string[]
+  discovered_via: string | null
+  verified_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface BrandMatch {
+  id: string
+  athlete_id: string
+  brand_id: string
+  fit_reason: string
+  status: MatchStatus
+  created_at: string
+  updated_at: string
+}
+
+export interface Deal {
+  id: string
+  athlete_id: string
+  brand_id: string
+  status: DealStatus
+  created_at: string
+  updated_at: string
+}
+
+export interface Message {
+  id: string
+  deal_id: string
+  direction: MessageDirection
+  subject: string | null
+  content: string
+  athlete_edited: boolean
+  created_at: string
+}
+
+export interface DiscoveryRun {
+  id: string
+  athlete_id: string
+  status: DiscoveryRunStatus
+  params: Record<string, unknown>
+  brands_found: number
+  matches_created: number
+  error: string | null
+  started_at: string | null
+  finished_at: string | null
+  created_at: string
+}
+
+type TableSpec<Row, Required extends keyof Row = never> = {
+  Row: Row
+  Insert: Partial<Row> & Pick<Row, Required>
+  Update: Partial<Row>
+  Relationships: []
+}
+
+export interface Database {
+  public: {
+    Tables: {
+      profiles: TableSpec<Profile, 'id'>
+      interviews: TableSpec<Interview, 'athlete_id'>
+      brands: TableSpec<Brand, 'domain' | 'name'>
+      brand_matches: TableSpec<BrandMatch, 'athlete_id' | 'brand_id'>
+      deals: TableSpec<Deal, 'athlete_id' | 'brand_id'>
+      messages: TableSpec<Message, 'deal_id' | 'direction' | 'content'>
+      discovery_runs: TableSpec<DiscoveryRun, 'athlete_id'>
+    }
+    Views: Record<string, never>
+    Functions: Record<string, never>
+    Enums: {
+      citizenship_status: CitizenshipStatus
+      match_status: MatchStatus
+      deal_status: DealStatus
+      message_direction: MessageDirection
+      discovery_run_status: DiscoveryRunStatus
+    }
+    CompositeTypes: Record<string, never>
+  }
+}
