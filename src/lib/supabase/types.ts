@@ -23,7 +23,7 @@ export type MessageDirection = 'outbound_draft' | 'inbound_pasted'
 
 export type DiscoveryRunStatus = 'queued' | 'running' | 'completed' | 'failed'
 
-export interface Profile {
+export type Profile = {
   id: string
   full_name: string
   school: string | null
@@ -39,7 +39,7 @@ export interface Profile {
   updated_at: string
 }
 
-export interface Interview {
+export type Interview = {
   id: string
   athlete_id: string
   interests: string[]
@@ -51,7 +51,7 @@ export interface Interview {
   updated_at: string
 }
 
-export interface Brand {
+export type Brand = {
   id: string
   domain: string
   name: string
@@ -65,7 +65,7 @@ export interface Brand {
   updated_at: string
 }
 
-export interface BrandMatch {
+export type BrandMatch = {
   id: string
   athlete_id: string
   brand_id: string
@@ -75,7 +75,7 @@ export interface BrandMatch {
   updated_at: string
 }
 
-export interface Deal {
+export type Deal = {
   id: string
   athlete_id: string
   brand_id: string
@@ -84,7 +84,7 @@ export interface Deal {
   updated_at: string
 }
 
-export interface Message {
+export type Message = {
   id: string
   deal_id: string
   direction: MessageDirection
@@ -94,7 +94,7 @@ export interface Message {
   created_at: string
 }
 
-export interface DiscoveryRun {
+export type DiscoveryRun = {
   id: string
   athlete_id: string
   status: DiscoveryRunStatus
