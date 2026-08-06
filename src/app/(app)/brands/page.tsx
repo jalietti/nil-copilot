@@ -1,10 +1,69 @@
-export default function BrandsPage() {
+import Link from 'next/link'
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
+import { DiscoveryControls } from './discovery-controls'
+import { MatchCard } from './match-card'
+import type { Brand, BrandMatch } from '@/lib/supabase/types'
+
+export default async function BrandsPage() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const [{ data: interview }, { data: matches }, { data: latestRun }] = await Promise.all([
+    supabase.from('interviews').select('id').eq('athlete_id', user.id).maybeSingle(),
+    supabase
+      .from('brand_matches')
+      .select('*, brands(*)')
+      .eq('athlete_id', user.id)
+      .neq('status', 'dismissed')
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('discovery_runs')
+      .select('status, brands_found, matches_created, created_at')
+      .eq('athlete_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ])
+
+  if (!interview) {
+    return (
+      <main>
+        <h1 className="mb-4 text-2xl font-semibold">Brand matches</h1>
+        <p className="text-sm text-neutral-600">
+          Do the{' '}
+          <Link href="/interview" className="underline">
+            interview
+          </Link>{' '}
+          first — that&apos;s how the copilot knows which brands to research for you.
+        </p>
+      </main>
+    )
+  }
+
+  const matchList = (matches ?? []) as (BrandMatch & { brands: Brand })[]
+
   return (
     <main>
-      <h1 className="mb-4 text-2xl font-semibold">Brand matches</h1>
-      <p className="text-sm text-neutral-600">
-        Live brand discovery lands here. (Built in step 6.)
-      </p>
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Brand matches</h1>
+        <DiscoveryControls latestRun={latestRun} />
+      </div>
+      {matchList.length === 0 ? (
+        <p className="text-sm text-neutral-600">
+          No matches yet. Kick off discovery and the copilot will research brands that actually fit
+          your interests — live research, not a fixed list.
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-4">
+          {matchList.map((match) => (
+            <MatchCard key={match.id} match={match} brand={match.brands} />
+          ))}
+        </ul>
+      )}
     </main>
   )
 }
