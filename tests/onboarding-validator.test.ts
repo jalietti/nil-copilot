@@ -18,7 +18,8 @@ describe('onboardingSchema', () => {
   })
 
   it('requires citizenship status — it cannot be skipped', () => {
-    const { citizenship_status: _dropped, ...rest } = valid
+    const rest: Partial<typeof valid> = { ...valid }
+    delete rest.citizenship_status
     expect(onboardingSchema.safeParse(rest).success).toBe(false)
     expect(onboardingSchema.safeParse({ ...valid, citizenship_status: 'unknown' }).success).toBe(false)
   })
