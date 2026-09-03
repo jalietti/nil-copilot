@@ -1,6 +1,19 @@
 -- NIL Copilot initial schema.
 -- Brand discovery cache (`brands`) is written ONLY by the service role from
 -- background jobs — live research results, never a hand-curated list.
+--
+-- Table-level access is still gated by the RLS policies below; these grants only
+-- let the anon/authenticated roles reach the tables at all. Supabase's default
+-- privileges normally add them automatically, but we set them explicitly so the
+-- migration is correct regardless of how it's applied.
+
+grant usage on schema public to anon, authenticated, service_role;
+alter default privileges in schema public
+  grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema public
+  grant all on sequences to anon, authenticated, service_role;
+alter default privileges in schema public
+  grant all on functions to anon, authenticated, service_role;
 
 create type citizenship_status as enum (
   'us_citizen',

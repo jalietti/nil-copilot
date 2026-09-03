@@ -32,12 +32,18 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  const { pathname } = request.nextUrl
   const isAuthRoute =
-    request.nextUrl.pathname.startsWith('/login') ||
-    request.nextUrl.pathname.startsWith('/signup') ||
-    request.nextUrl.pathname.startsWith('/auth')
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/signup') ||
+    pathname.startsWith('/auth')
 
-  if (!user && !isAuthRoute && request.nextUrl.pathname !== '/') {
+  // API routes authenticate themselves (e.g. Inngest verifies its own signing
+  // key) and must never be bounced to the HTML login page — doing so would make
+  // the background-job endpoint unreachable from Inngest's servers.
+  const isApiRoute = pathname.startsWith('/api')
+
+  if (!user && !isAuthRoute && !isApiRoute && pathname !== '/') {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
