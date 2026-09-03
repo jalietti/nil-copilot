@@ -69,6 +69,27 @@ async function draft(prompt: string): Promise<EmailDraft> {
   return parsed.data
 }
 
+// Shared voice guide. These emails are the athlete selling themselves to a
+// brand they genuinely like — they should read like a real, likeable person
+// wrote them, not like a template.
+const VOICE = [
+  'Voice — this is the whole point, get it right:',
+  '- Sound like a real 20-year-old who is genuinely excited, not a press release.',
+  "  Warm, a little informal, human. Use contractions. Let some personality through.",
+  '- Vary sentence length and rhythm. Short punchy lines are good. Avoid the',
+  '  four-even-paragraphs-of-equal-length template shape.',
+  '- Open with something real and specific — a concrete moment, product, or memory —',
+  "  not \"I'm a student-athlete and I'm reaching out about a partnership.\"",
+  '- Show real enthusiasm for THIS brand. Specifics prove it; generic praise',
+  '  ("I love your products") reads as filler — cut it or replace it with a detail.',
+  '- No corporate filler: drop "I hope this email finds you well", "I wanted to',
+  '  reach out", "synergy", "leverage", "circle back", stiff closers like',
+  '  "Best regards". A simple "Thanks so much," / "Talk soon," feels human.',
+  '- Confident and self-respecting, never groveling or over-apologizing for a small',
+  '  following. It is a strength framed right, not a weakness to excuse.',
+  '- Warm ≠ gushing. One genuine, grounded voice — no exclamation-point pile-ups.',
+].join('\n')
+
 // First-touch outreach. The copilot only drafts — the athlete edits and sends
 // it themselves via mailto.
 export async function draftOutreachEmail(args: {
@@ -83,9 +104,11 @@ export async function draftOutreachEmail(args: {
       'The athlete will review, edit, and send it themselves from their own email account —',
       'write in their first-person voice, ready to send as-is.',
       '',
-      'Guidelines:',
-      '- Short (under 180 words), warm, specific, zero corporate-speak.',
-      '- Lead with genuine connection to the brand (they actually use or love this stuff).',
+      VOICE,
+      '',
+      'For this first email specifically:',
+      '- Keep it short — 120-160 words. A tight, warm email beats a thorough one.',
+      '- Lead with the genuine connection to the brand (they actually use/love this stuff).',
       '- Be honest about audience size; frame it as authentic reach, not big numbers.',
       '- Suggest an open-ended partnership conversation; do NOT quote prices in a first email.',
       '- No placeholders, no invented facts, no emoji.',
@@ -123,13 +146,16 @@ export async function draftCounterEmail(args: {
       'The athlete pasted in the brand\'s latest reply; write the response they would send',
       'from their own email account. First-person, ready to send.',
       '',
-      'Guidelines:',
+      VOICE,
+      '',
+      'For this negotiation reply specifically:',
       '- Anchor the ask to the athlete\'s stated compensation preferences below and the',
       '  apparent value of the product involved. Modest following = modest, honest asks.',
+      '- React like a person first — a genuine reaction to their message before the ask.',
       '- Be collaborative, not adversarial; keep the relationship warm either way.',
       '- Be concrete about what the athlete would deliver (posts they would make anyway).',
       '- If the brand\'s offer already meets the athlete\'s stated preference, accept',
-      '  gracefully instead of pushing for more.',
+      '  gracefully and enthusiastically instead of pushing for more.',
       '- No placeholders, no invented facts, no emoji.',
       '',
       '## Athlete',
