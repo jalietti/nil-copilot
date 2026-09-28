@@ -11,20 +11,22 @@ interface Props {
     matches_created: number
     created_at: string
   } | null
+  // Computed server-side: queued/running and not stale.
+  inFlight: boolean
 }
 
-export function DiscoveryControls({ latestRun }: Props) {
+export function DiscoveryControls({ latestRun, inFlight }: Props) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  const running = latestRun?.status === 'queued' || latestRun?.status === 'running'
+  const running = inFlight
 
   function handleClick() {
     setError(null)
     startTransition(async () => {
       const result = await startDiscovery()
-      if (result?.error) setError(result.error)
+      if (!result.ok) setError(result.message)
     })
   }
 
@@ -49,10 +51,10 @@ export function DiscoveryControls({ latestRun }: Props) {
           Last run: {latestRun.brands_found} brands researched, {latestRun.matches_created} matches
         </p>
       )}
-      {latestRun?.status === 'failed' && (
+      {latestRun?.status === 'failed' && !error && (
         <p className="text-xs text-red-600">Last run failed — try again</p>
       )}
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
     </div>
   )
 }

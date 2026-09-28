@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { DiscoveryControls } from './discovery-controls'
 import { MatchCard } from './match-card'
+import { isRunInFlight } from '@/lib/discovery-guard'
 import type { Brand, BrandMatch } from '@/lib/supabase/types'
 
 export default async function BrandsPage() {
@@ -50,7 +51,10 @@ export default async function BrandsPage() {
     <main>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Brand matches</h1>
-        <DiscoveryControls latestRun={latestRun} />
+        <DiscoveryControls
+          latestRun={latestRun}
+          inFlight={latestRun ? isRunInFlight(latestRun, new Date()) : false}
+        />
       </div>
       {matchList.length === 0 ? (
         <p className="text-sm text-neutral-600">

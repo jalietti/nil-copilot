@@ -3,9 +3,20 @@
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { inngest } from '@/inngest/client'
+import {
+  DISCOVERY_BLOCK_MESSAGES,
+  dailyWindowStart,
+  evaluateDiscoveryGuard,
+  type DiscoveryBlockReason,
+} from '@/lib/discovery-guard'
 
-export async function startDiscovery(): Promise<{ error?: string }> {
+export type StartDiscoveryResult =
+  | { ok: true }
+  | { ok: false; reason: DiscoveryBlockReason | 'error'; message: string }
+
+export async function startDiscovery(): Promise<StartDiscoveryResult> {
   const supabase = await createClient()
   const {
     data: { user },
@@ -19,20 +30,58 @@ export async function startDiscovery(): Promise<{ error?: string }> {
     .maybeSingle()
   if (!interview) redirect('/interview')
 
+  const now = new Date()
+  const { data: runs, error: runsError } = await supabase
+    .from('discovery_runs')
+    .select('id, status, created_at')
+    .eq('athlete_id', user.id)
+    .or(`status.in.(queued,running),created_at.gte.${dailyWindowStart(now)}`)
+  if (runsError) return { ok: false, reason: 'error', message: runsError.message }
+
+  const guard = evaluateDiscoveryGuard(runs ?? [], now)
+  if (!guard.allowed) {
+    return { ok: false, reason: guard.reason, message: DISCOVERY_BLOCK_MESSAGES[guard.reason] }
+  }
+
+  // Athletes can't update runs (only the job can), so the service role retires
+  // dead runs — otherwise the one-in-flight index would block the insert.
+  if (guard.staleRunIds.length > 0) {
+    await createAdminClient()
+      .from('discovery_runs')
+      .update({ status: 'failed', error: 'Timed out', finished_at: now.toISOString() })
+      .in('id', guard.staleRunIds)
+      .in('status', ['queued', 'running'])
+  }
+
   const { data: run, error } = await supabase
     .from('discovery_runs')
     .insert({ athlete_id: user.id })
     .select('id')
     .single()
-  if (error) return { error: error.message }
+  if (error) {
+    // Unique violation on the one-in-flight index: a concurrent request won.
+    if (error.code === '23505') {
+      return { ok: false, reason: 'in_progress', message: DISCOVERY_BLOCK_MESSAGES.in_progress }
+    }
+    return { ok: false, reason: 'error', message: error.message }
+  }
 
-  await inngest.send({
-    name: 'app/discover-brands.requested',
-    data: { athleteId: user.id, runId: run.id },
-  })
+  try {
+    await inngest.send({
+      name: 'app/discover-brands.requested',
+      data: { athleteId: user.id, runId: run.id },
+    })
+  } catch {
+    // Never leave a queued row behind for a job that was never enqueued.
+    await createAdminClient()
+      .from('discovery_runs')
+      .update({ status: 'failed', error: 'Could not enqueue', finished_at: now.toISOString() })
+      .eq('id', run.id)
+    return { ok: false, reason: 'error', message: 'Could not start discovery — try again' }
+  }
 
   revalidatePath('/brands')
-  return {}
+  return { ok: true }
 }
 
 export async function dismissMatch(matchId: string): Promise<void> {
