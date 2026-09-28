@@ -98,6 +98,7 @@ test('seeded athlete: follow-up prompt, draft, regenerate, edit, reply, counter,
   const body = page.getByLabel('Body')
   await expect(body).toHaveValue(/E2E OUTREACH DRAFT/)
   await expect(page.getByText('Optional: if they write back')).toBeVisible()
+  await expect(page.getByText('Visa check')).toBeHidden()
   const mailto = page.getByRole('link', { name: 'Open in your email app' })
   await expect(mailto).toHaveAttribute('href', /^mailto:press@glassreef\.test\?subject=E2E%20outreach%20subject/)
 
@@ -120,6 +121,9 @@ test('seeded athlete: follow-up prompt, draft, regenerate, edit, reply, counter,
   await page.getByRole('button', { name: 'Draft my reply' }).click()
   await expect(page.getByLabel('Body')).toHaveValue(/E2E COUNTER DRAFT/)
   await expect(page.getByText('negotiating', { exact: true })).toBeVisible()
+  // Maya is on an F-1 visa: once a deal is live, the DSO reminder shows.
+  await expect(page.getByText('Visa check')).toBeVisible()
+  await expect(page.getByText(/check it with your Designated School Official/)).toBeVisible()
 
   // "I'm done with this one" from the dashboard prompt closes the deal.
   await page.goto('/dashboard')

@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import type { Brand, Deal, Message } from '@/lib/supabase/types'
+import { dealVisaReminder } from '@/lib/visa-guidance'
 import { DealThread } from './deal-thread'
 
 export default async function DealPage({ params }: { params: Promise<{ id: string }> }) {
@@ -19,7 +20,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
   if (!dealRow) notFound()
   const deal = dealRow as unknown as Deal & { brands: Brand }
 
-  const [{ data: messages }, { data: match }] = await Promise.all([
+  const [{ data: messages }, { data: match }, { data: profile }] = await Promise.all([
     supabase.from('messages').select('*').eq('deal_id', id).order('created_at', { ascending: true }),
     supabase
       .from('brand_matches')
@@ -27,7 +28,9 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
       .eq('athlete_id', user.id)
       .eq('brand_id', deal.brand_id)
       .maybeSingle(),
+    supabase.from('profiles').select('citizenship_status').eq('id', user.id).single(),
   ])
+  const visaReminder = dealVisaReminder(profile?.citizenship_status ?? null, deal.status)
 
   const brand = deal.brands
 
@@ -43,6 +46,13 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
         The copilot drafts; you always review and hit send from your own email. Nothing is ever
         sent for you.
       </p>
+      {visaReminder && (
+        <aside className="mb-6 rounded border border-amber-300 bg-amber-50 p-3 text-sm">
+          <p className="mb-1 font-medium">Visa check</p>
+          <p className="mb-1">{visaReminder.message}</p>
+          <p className="text-xs text-neutral-600">{visaReminder.disclaimer}</p>
+        </aside>
+      )}
       <DealThread
         dealId={deal.id}
         dealStatus={deal.status}

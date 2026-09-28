@@ -1,4 +1,4 @@
-import type { CitizenshipStatus } from './supabase/types'
+import type { CitizenshipStatus, DealStatus } from './supabase/types'
 
 export interface VisaGuidance {
   headline: string
@@ -44,5 +44,30 @@ export function getVisaGuidance(status: CitizenshipStatus): VisaGuidance | null 
     case 'us_citizen':
     case 'permanent_resident':
       return null
+  }
+}
+
+// Shown on a deal once money or product is actually on the table, for
+// athletes whose visa status means NIL income needs their school's sign-off.
+// Informational only: it never blocks anything and makes no claim about what
+// is allowed — it points to the DSO, with the same disclaimer as onboarding.
+const REMINDER_STATUSES = new Set<CitizenshipStatus>(['f1_visa', 'other_visa'])
+const REMINDER_DEAL_STATUSES = new Set<DealStatus>(['reply_received', 'negotiating', 'agreed'])
+
+export interface DealVisaReminder {
+  message: string
+  disclaimer: string
+}
+
+export function dealVisaReminder(
+  citizenship: CitizenshipStatus | null,
+  dealStatus: DealStatus,
+): DealVisaReminder | null {
+  if (!citizenship || !REMINDER_STATUSES.has(citizenship)) return null
+  if (!REMINDER_DEAL_STATUSES.has(dealStatus)) return null
+  return {
+    message:
+      'Before you agree to or start this deal, check it with your Designated School Official (DSO) or international student office — NIL work can affect your visa status.',
+    disclaimer: DISCLAIMER,
   }
 }

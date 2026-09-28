@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getVisaGuidance } from '@/lib/visa-guidance'
+import { dealVisaReminder, getVisaGuidance } from '@/lib/visa-guidance'
 
 describe('getVisaGuidance', () => {
   it('gives real guidance, not silence, for every visa-affected status', () => {
@@ -21,5 +21,27 @@ describe('getVisaGuidance', () => {
   it('returns null for statuses with no immigration restriction', () => {
     expect(getVisaGuidance('us_citizen')).toBeNull()
     expect(getVisaGuidance('permanent_resident')).toBeNull()
+  })
+})
+
+describe('dealVisaReminder', () => {
+  it('reminds F-1 and other-visa athletes once a deal is live, with the disclaimer', () => {
+    for (const status of ['f1_visa', 'other_visa'] as const) {
+      for (const deal of ['reply_received', 'negotiating', 'agreed'] as const) {
+        const reminder = dealVisaReminder(status, deal)
+        expect(reminder?.message).toMatch(/DSO/)
+        expect(reminder?.disclaimer).toMatch(/not legal or immigration advice/)
+      }
+    }
+  })
+
+  it('stays quiet before anything is on the table, after it ends, and for other statuses', () => {
+    expect(dealVisaReminder('f1_visa', 'draft')).toBeNull()
+    expect(dealVisaReminder('f1_visa', 'sent')).toBeNull()
+    expect(dealVisaReminder('f1_visa', 'dead')).toBeNull()
+    for (const status of ['us_citizen', 'permanent_resident', 'prefer_not_to_say'] as const) {
+      expect(dealVisaReminder(status, 'negotiating')).toBeNull()
+    }
+    expect(dealVisaReminder(null, 'negotiating')).toBeNull()
   })
 })
