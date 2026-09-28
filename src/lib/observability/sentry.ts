@@ -1,8 +1,8 @@
 import * as Sentry from '@sentry/nextjs'
 import { SENTRY_DATA_COLLECTION, scrubSentryEvent } from './scrub'
 
-// Shared Sentry setup for client, server, and edge. Errors only — no tracing,
-// no replay. Without NEXT_PUBLIC_SENTRY_DSN (local dev, tests) nothing is
+// Shared Sentry setup for client, server, and edge. Errors only (tracing off,
+// no replay). Without NEXT_PUBLIC_SENTRY_DSN (local dev, tests) nothing is
 // initialized and every Sentry call is a no-op.
 export function initSentry(): void {
   const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN
@@ -13,7 +13,6 @@ export function initSentry(): void {
     dataCollection: SENTRY_DATA_COLLECTION,
     tracesSampleRate: 0,
     beforeSend: scrubSentryEvent,
-    beforeSendTransaction: () => null,
   })
 }
 
