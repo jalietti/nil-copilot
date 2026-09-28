@@ -21,16 +21,24 @@ add() { # name value sensitive(yes|no)
   echo "  set $1"
 }
 
-ask() { # name prompt secret(yes|no) [default]
-  local value
-  if [ "$3" = yes ]; then
-    read -rsp "$2: " value; echo
+read_value() { # prompt secret(yes|no) [default] -> $value
+  if [ "$2" = yes ]; then
+    read -rsp "$1: " value; echo
   else
-    read -rp "$2${4:+ [$4]}: " value
-    value="${value:-${4:-}}"
+    read -rp "$1${3:+ [$3]}: " value
+    value="${value:-${3:-}}"
   fi
+}
+
+ask() { # name prompt secret(yes|no) [default]
+  read_value "$2" "$3" "${4:-}"
   [ -n "$value" ] || { echo "  $1 is required"; exit 1; }
   add "$1" "$value" "$3"
+}
+
+ask_optional() { # name prompt secret(yes|no) [default] — Enter skips
+  read_value "$2 (Enter to skip)" "$3" "${4:-}"
+  if [ -n "$value" ]; then add "$1" "$value" "$3"; else echo "  skipped $1"; fi
 }
 
 echo "Fetching Supabase keys for $ref..."
@@ -49,9 +57,12 @@ echo "Paste each value (fresh production keys, not the ones in .env.local)."
 ask ANTHROPIC_API_KEY "Anthropic API key" yes
 ask TAVILY_API_KEY "Tavily API key" yes
 ask NEXT_PUBLIC_SENTRY_DSN "Sentry DSN (https://...ingest...sentry.io/...)" no
-ask SENTRY_ORG "Sentry organization slug" no
-ask SENTRY_PROJECT "Sentry project slug" no nil-copilot
-ask SENTRY_AUTH_TOKEN "Sentry auth token" yes
+# Source-map upload only (readable stack traces); errors are captured without.
+ask_optional SENTRY_AUTH_TOKEN "Sentry auth token" yes
+if [ -n "$value" ]; then
+  ask SENTRY_ORG "Sentry organization slug" no
+  ask SENTRY_PROJECT "Sentry project slug" no nil-copilot
+fi
 ask POSTHOG_KEY "PostHog project API key (phc_...)" no
 ask POSTHOG_HOST "PostHog host" no https://us.i.posthog.com
 
