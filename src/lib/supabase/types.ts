@@ -59,6 +59,7 @@ export type Brand = {
   description: string | null
   categories: string[]
   contact_email: string | null
+  contact_checked_at: string | null
   source_urls: string[]
   discovered_via: string | null
   verified_at: string | null

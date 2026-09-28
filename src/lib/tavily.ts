@@ -45,3 +45,13 @@ export async function tavilyExtract(
   })
   return data.results ?? []
 }
+
+// Where brands usually list a contact address: /contact and /about, plus the
+// common variants (/contact-us, and Shopify's /pages/contact). Pages that
+// don't exist just come back absent; one extract call covers them all.
+const CONTACT_PATHS = ['/contact', '/contact-us', '/pages/contact', '/about']
+
+export async function tavilyExtractContactPages(domain: string): Promise<string[]> {
+  const pages = await tavilyExtract(CONTACT_PATHS.map((path) => `https://${domain}${path}`))
+  return pages.map((page) => page.raw_content).filter(Boolean)
+}

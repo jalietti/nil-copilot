@@ -1,13 +1,27 @@
+import { resolveMx } from 'node:dns/promises'
 import { inngest } from '../client'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAnthropicClient, COPILOT_MODEL } from '@/lib/anthropic'
-import { tavilySearch, tavilyExtract } from '@/lib/tavily'
+import { tavilySearch, tavilyExtract, tavilyExtractContactPages } from '@/lib/tavily'
 import { candidateDomains, parseBrandEval, type BrandEval } from '@/lib/discovery'
+import {
+  extractEmails,
+  findContactEmail,
+  needsContactLookup,
+  type ContactLookupDeps,
+} from '@/lib/contact-email'
 import { track } from '@/lib/analytics'
 import * as Sentry from '@sentry/nextjs'
 
 const SEARCH_TAGS_PER_RUN = 3
 const NEW_CANDIDATES_PER_TAG = 3
+// Cached brands without an email whose contact pages are re-checked per run.
+const CACHED_CONTACT_RECHECKS_PER_RUN = 3
+
+const contactDeps: ContactLookupDeps = {
+  fetchContactPages: tavilyExtractContactPages,
+  resolveMx,
+}
 
 // Live brand discovery: search the web for brands matching the athlete's real
 // interests, evaluate fit with Claude, and grow the shared cache. Runs as an
@@ -49,10 +63,10 @@ export const discoverBrands = inngest.createFunction(
     })
 
     // 1. Cache first: match existing verified brands by category overlap.
-    const cachedMatchIds = await step.run('match-from-cache', async () => {
+    const cached = await step.run('match-from-cache', async () => {
       const { data: cached } = await supabase
         .from('brands')
-        .select('id, domain')
+        .select('id, domain, contact_email, contact_checked_at')
         .overlaps('categories', interview.category_tags)
         .not('verified_at', 'is', null)
         .limit(20)
@@ -66,8 +80,24 @@ export const discoverBrands = inngest.createFunction(
         { onConflict: 'athlete_id,brand_id', ignoreDuplicates: true },
       )
       if (error) throw new Error(error.message)
-      return cached.map((b) => b.id)
+      return cached
     })
+    const cachedMatchIds = cached.map((b) => b.id)
+
+    // Cached matches with no email are unactionable; look again, but not for
+    // brands whose pages were checked recently.
+    const due = cached
+      .filter((b) => needsContactLookup(b, new Date()))
+      .slice(0, CACHED_CONTACT_RECHECKS_PER_RUN)
+    for (const brand of due) {
+      await step.run(`recheck-contact-${brand.domain}`, async () => {
+        const { email } = await findContactEmail(brand.domain, [], contactDeps)
+        await supabase
+          .from('brands')
+          .update({ contact_email: email, contact_checked_at: new Date().toISOString() })
+          .eq('id', brand.id)
+      })
+    }
 
     // 2. Live research per category tag.
     const tags = interview.category_tags.slice(0, SEARCH_TAGS_PER_RUN)
@@ -85,10 +115,21 @@ export const discoverBrands = inngest.createFunction(
       })
 
       for (const candidate of candidates) {
-        const evaluation = await step.run(`evaluate-${candidate.domain}`, () =>
+        const evaluated = await step.run(`evaluate-${candidate.domain}`, () =>
           evaluateCandidate(candidate.url, interview.interests, tag),
         )
-        if (!evaluation || !evaluation.is_real_brand) continue
+        if (!evaluated || !evaluated.evaluation.is_real_brand) continue
+        const { evaluation } = evaluated
+
+        // Validated (syntax + MX) or null; /contact and /about only if the
+        // homepage had nothing usable.
+        const contact = await step.run(`contact-${candidate.domain}`, () =>
+          findContactEmail(
+            candidate.domain,
+            [evaluation.contact_email, ...evaluated.pageEmails],
+            contactDeps,
+          ),
+        )
 
         const stored = await step.run(`store-${candidate.domain}`, async () => {
           const { data: brand, error } = await supabase
@@ -99,7 +140,8 @@ export const discoverBrands = inngest.createFunction(
                 name: evaluation.name,
                 description: evaluation.description,
                 categories: evaluation.categories,
-                contact_email: evaluation.contact_email,
+                contact_email: contact.email,
+                contact_checked_at: new Date().toISOString(),
                 source_urls: [candidate.url],
                 discovered_via: `tavily:${tag}`,
                 verified_at: new Date().toISOString(),
@@ -163,10 +205,11 @@ async function evaluateCandidate(
   url: string,
   interests: string[],
   tag: string,
-): Promise<BrandEval | null> {
+): Promise<{ evaluation: BrandEval; pageEmails: string[] } | null> {
   const pages = await tavilyExtract([url])
-  const content = pages[0]?.raw_content?.slice(0, 12_000)
-  if (!content) return null
+  const fullContent = pages[0]?.raw_content
+  const content = fullContent?.slice(0, 12_000)
+  if (!fullContent || !content) return null
 
   const client = createAnthropicClient()
   const response = await client.messages.create({
@@ -232,5 +275,7 @@ async function evaluateCandidate(
   })
 
   const text = response.content.find((block) => block.type === 'text')?.text ?? ''
-  return parseBrandEval(text)
+  const evaluation = parseBrandEval(text)
+  // Footers (where emails usually live) can fall past the slice Claude sees.
+  return evaluation ? { evaluation, pageEmails: extractEmails(fullContent) } : null
 }
