@@ -10,7 +10,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:rls": "set -a && eval \"$(npx -y supabase@2 status -o env)\" && set +a && vitest run --config vitest.integration.config.mts",
-    "eval:discovery": "tsx --env-file-if-exists=.env.local scripts/discovery-eval.ts"
+    "eval:discovery": "tsx --env-file-if-exists=.env.local scripts/discovery-eval.ts",
+    "dev:local": "bash scripts/dev-local.sh",
+    "db:reset": "npx -y supabase@2 db reset"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

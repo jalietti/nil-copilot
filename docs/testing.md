@@ -37,18 +37,23 @@ npm run test:rls
 code and throwaway users, so they can run against a stack you're also using
 for local development.
 
-## Local end-to-end against the local stack
-
-`supabase/config.toml` configures the local stack with email confirmations on
-(the confirmation emails land in Mailpit at http://127.0.0.1:54324). To point
-the app at it instead of a hosted project, override the three Supabase
-variables from `npx supabase status -o env` (`API_URL`, `ANON_KEY`,
-`SERVICE_ROLE_KEY`) and mint an invite code:
+## Local app against the local stack (design + manual testing)
 
 ```bash
-docker exec supabase_db_nil-copilot psql -U postgres \
-  -c "insert into invite_codes (code, label) values ('LOCALDEV1', 'local dev')"
+npm run dev:local   # starts local Supabase (Docker), then next dev on :3000
+npm run db:reset    # wipe local data: re-apply all migrations + the seed
 ```
+
+`dev:local` points the app at the local stack for that process only
+(`.env.local` is untouched; its Anthropic/Tavily keys are still used if you
+draft or run discovery). `supabase/seed.sql` loads an athlete with the app in
+every state — matches with and without emails, deals in every status, a
+"did you hear back?" prompt, a pasted reply and an edited counter draft — so
+every screen can be designed without spending API credits. Log in as
+`maya@example.test` / `nilcopilot-local` (or `new@example.test` for the
+onboarding flow); sign up new test accounts with invite code `LOCALDEV1`.
+Confirmation and reset emails land in Mailpit at http://127.0.0.1:54324.
+Seeds run only locally; `supabase db push` never applies them.
 
 ## Discovery quality check (`npm run eval:discovery`)
 
