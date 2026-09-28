@@ -15,6 +15,7 @@ ref="${1:?Usage: npm run pilot:vercel-env -- <prod-supabase-project-ref>}"
 vercel() { npx -y vercel@latest "$@"; }
 
 add() { # name value sensitive(yes|no)
+  [ -n "$2" ] || { echo "  refusing to set $1 to an empty value"; exit 1; }
   local flag=--no-sensitive
   [ "$3" = yes ] && flag=--sensitive
   printf '%s' "$2" | vercel env add "$1" production --force "$flag" > /dev/null
@@ -43,14 +44,21 @@ ask_optional() { # name prompt secret(yes|no) [default] — Enter skips
 
 echo "Fetching Supabase keys for $ref..."
 keys="$(npx -y supabase@2 projects api-keys --project-ref "$ref" --reveal --output-format json)"
+# The CLI returns { "keys": [...] }; prefer the new publishable/secret keys,
+# falling back to the legacy anon/service_role ones. Fails loudly if missing.
 pick() { node -e '
-  const keys = JSON.parse(require("fs").readFileSync(0, "utf8"));
-  const k = keys.find((k) => k.type === process.argv[1] || k.name === process.argv[2]);
-  if (!k) process.exit(1);
+  const out = JSON.parse(require("fs").readFileSync(0, "utf8"));
+  const keys = Array.isArray(out) ? out : out.keys ?? [];
+  const k = keys.find((k) => k.type === process.argv[1]) ?? keys.find((k) => k.name === process.argv[2]);
+  if (!k?.api_key) { console.error(`No ${process.argv[1]} key found`); process.exit(1); }
   process.stdout.write(k.api_key);' "$1" "$2" <<< "$keys"; }
+# Assigned first (not inside the add call) so a failure stops the script
+# instead of saving an empty value.
+publishable="$(pick publishable anon)"
+secret="$(pick secret service_role)"
 add NEXT_PUBLIC_SUPABASE_URL "https://$ref.supabase.co" no
-add NEXT_PUBLIC_SUPABASE_ANON_KEY "$(pick publishable anon)" no
-add SUPABASE_SERVICE_ROLE_KEY "$(pick secret service_role)" yes
+add NEXT_PUBLIC_SUPABASE_ANON_KEY "$publishable" no
+add SUPABASE_SERVICE_ROLE_KEY "$secret" yes
 
 echo
 echo "Paste each value (fresh production keys, not the ones in .env.local)."

@@ -9,7 +9,10 @@ export function supabaseProject(ref: string): { url: string; publishableKey: str
     ['-y', 'supabase@2', 'projects', 'api-keys', '--project-ref', ref, '--reveal', '--output-format', 'json'],
     { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] },
   )
-  const keys = JSON.parse(raw) as { name?: string; type?: string; api_key: string }[]
+  type Key = { name?: string; type?: string; api_key: string }
+  // The CLI returns { keys: [...] } (older versions: a bare array).
+  const parsed = JSON.parse(raw) as Key[] | { keys?: Key[] }
+  const keys = Array.isArray(parsed) ? parsed : (parsed.keys ?? [])
   const find = (type: string, legacyName: string) =>
     keys.find((k) => k.type === type)?.api_key ?? keys.find((k) => k.name === legacyName)?.api_key
   const publishableKey = find('publishable', 'anon')
