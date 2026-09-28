@@ -131,7 +131,7 @@ describe('isolation', () => {
       ),
     ).rejects.toThrow(/permission denied/)
     await expect(
-      as(db, 'authenticated', B, (tx) => tx.query(`select record_brand_outcome($1, true, true)`, [BRAND])),
+      as(db, 'authenticated', B, (tx) => tx.query(`select record_brand_outcome($1, $2, true, true)`, [B, BRAND])),
     ).rejects.toThrow(/permission denied/)
   })
 
@@ -148,5 +148,57 @@ describe('isolation', () => {
       deals: (await tx.query('select * from deals')).rows,
     }))
     expect(seen).toEqual({ messages: [], deals: [] })
+  })
+})
+
+describe('athlete-added contact emails (0009)', () => {
+  const addMatch = async (uid: string) =>
+    (
+      await db.query<{ id: string }>(
+        'insert into brand_matches (athlete_id, brand_id) values ($1, $2) returning id',
+        [uid, BRAND],
+      )
+    ).rows[0].id
+
+  it("an athlete can set the email on their own match, but not on another athlete's", async () => {
+    const aMatch = await addMatch(A)
+    const bMatch = await addMatch(B)
+    const updated = await asAthlete(A, async (tx) => {
+      await tx.query(`update brand_matches set contact_email = 'hello@reef.test' where id = $1`, [aMatch])
+      return (await tx.query(`update brand_matches set contact_email = 'x@evil.test' where id = $1`, [bMatch]))
+        .affectedRows
+    })
+    expect(updated).toBe(0)
+    const { rows } = await db.query<{ id: string; contact_email: string | null }>(
+      'select id, contact_email from brand_matches order by athlete_id',
+    )
+    expect(rows).toEqual([
+      { id: aMatch, contact_email: 'hello@reef.test' },
+      { id: bMatch, contact_email: null },
+    ])
+  })
+
+  it('rejects values that are not email-shaped', async () => {
+    const aMatch = await addMatch(A)
+    await expect(
+      asAthlete(A, (tx) =>
+        tx.query(`update brand_matches set contact_email = 'not an email' where id = $1`, [aMatch]),
+      ),
+    ).rejects.toThrow(/check constraint/)
+  })
+
+  it('a pasted reply records the email the athlete actually used as the working one', async () => {
+    const aMatch = await addMatch(A)
+    await asAthlete(A, (tx) =>
+      tx.query(`update brand_matches set contact_email = 'collabs@reef.test' where id = $1`, [aMatch]),
+    )
+    const deal = await athleteDeal(A)
+    await asAthlete(A, (tx) =>
+      tx.query(`insert into messages (deal_id, direction, content) values ($1, 'inbound_pasted', $2)`, [
+        deal,
+        REPLY,
+      ]),
+    )
+    expect(await outcome()).toMatchObject({ any_reply: true, working_contact_email: 'collabs@reef.test' })
   })
 })

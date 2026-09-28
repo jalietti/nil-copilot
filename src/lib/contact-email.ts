@@ -88,6 +88,13 @@ export function rankContactEmails(candidates: string[], brandDomain: string): st
   return scored.map((s) => s.email)
 }
 
+// For an address an athlete typed in: well-formed and not a mailbox nobody
+// reads. (Any domain is fine — they may know the brand's real address.)
+export function isUsableAthleteEmail(email: string): boolean {
+  if (!emailSchema.safeParse(email).success) return false
+  return !BLOCKED_LOCAL_PARTS.has(email.split('@')[0].split('+')[0])
+}
+
 export type MxResolver = (domain: string) => Promise<{ exchange: string }[]>
 
 // Syntax + at least one MX record. DNS failures count as invalid.

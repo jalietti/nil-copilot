@@ -17,6 +17,7 @@ export interface AnalyticsEvents {
     matches_with_email: number
   }
   match_dismissed: { match_id: string; brand_id: string }
+  contact_email_added: { match_id: string; brand_id: string }
   outreach_draft_generated: { deal_id: string; brand_id: string; voice_profile: boolean }
   follow_up_draft_generated: { deal_id: string; voice_profile: boolean }
   mailto_clicked: { deal_id: string; kind: 'outreach' | 'counter' | 'follow_up' }

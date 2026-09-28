@@ -1,5 +1,6 @@
 'use server'
 
+import { resolveMx } from 'node:dns/promises'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { after } from 'next/server'
@@ -8,6 +9,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { inngest } from '@/inngest/client'
 import { track } from '@/lib/analytics'
 import { reportError } from '@/lib/observability/sentry'
+import { hasValidMx, isUsableAthleteEmail } from '@/lib/contact-email'
 import {
   DISCOVERY_BLOCK_MESSAGES,
   dailyWindowStart,
@@ -146,4 +148,37 @@ export async function startDeal(matchId: string): Promise<{ error?: string }> {
   }
 
   redirect(`/deals/${dealId}`)
+}
+
+// The athlete knows (or found) a contact address discovery didn't. Stored on
+// their own match only; validated with the same syntax + MX check discovery
+// uses, so a typo can't become a dead-end mailto.
+export async function addContactEmail(
+  matchId: string,
+  rawEmail: string,
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const email = rawEmail.trim().toLowerCase()
+  if (!isUsableAthleteEmail(email)) return { error: 'That doesn’t look like a usable email address' }
+  if (!(await hasValidMx(email, resolveMx))) {
+    return { error: `${email.split('@')[1]} can’t receive email — double-check the address` }
+  }
+
+  const { data: match, error } = await supabase
+    .from('brand_matches')
+    .update({ contact_email: email })
+    .eq('id', matchId)
+    .select('brand_id')
+    .maybeSingle()
+  if (error) return { error: error.message }
+  if (!match) return { error: 'Match not found' }
+
+  after(() => track('contact_email_added', user.id, { match_id: matchId, brand_id: match.brand_id }))
+  revalidatePath('/brands')
+  return {}
 }

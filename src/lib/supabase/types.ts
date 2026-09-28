@@ -74,6 +74,8 @@ export type BrandMatch = {
   brand_id: string
   fit_reason: string
   status: MatchStatus
+  // Added by the athlete (validated); private to their match.
+  contact_email: string | null
   created_at: string
   updated_at: string
 }

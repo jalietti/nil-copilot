@@ -19,11 +19,15 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
   if (!dealRow) notFound()
   const deal = dealRow as unknown as Deal & { brands: Brand }
 
-  const { data: messages } = await supabase
-    .from('messages')
-    .select('*')
-    .eq('deal_id', id)
-    .order('created_at', { ascending: true })
+  const [{ data: messages }, { data: match }] = await Promise.all([
+    supabase.from('messages').select('*').eq('deal_id', id).order('created_at', { ascending: true }),
+    supabase
+      .from('brand_matches')
+      .select('contact_email')
+      .eq('athlete_id', user.id)
+      .eq('brand_id', deal.brand_id)
+      .maybeSingle(),
+  ])
 
   const brand = deal.brands
 
@@ -43,7 +47,7 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
         dealId={deal.id}
         dealStatus={deal.status}
         brandName={brand.name}
-        contactEmail={brand.contact_email}
+        contactEmail={match?.contact_email ?? brand.contact_email}
         messages={(messages ?? []) as Message[]}
       />
     </main>

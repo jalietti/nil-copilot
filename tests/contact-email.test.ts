@@ -7,6 +7,7 @@ import {
   findContactEmail,
   hasValidMx,
   isRoleAddress,
+  isUsableAthleteEmail,
   needsContactLookup,
   rankContactEmails,
   type MxResolver,
@@ -138,5 +139,18 @@ describe('needsContactLookup', () => {
     expect(needsContactLookup({ contact_email: null, contact_checked_at: daysAgo(2) }, now)).toBe(false)
     const stale = new Date(now.getTime() - CONTACT_RECHECK_MS).toISOString()
     expect(needsContactLookup({ contact_email: null, contact_checked_at: stale }, now)).toBe(true)
+  })
+})
+
+describe('isUsableAthleteEmail', () => {
+  it('accepts any well-formed address on any domain', () => {
+    expect(isUsableAthleteEmail('jamie@ridgelinegear.com')).toBe(true)
+    expect(isUsableAthleteEmail('ridgeline.collabs@agency.io')).toBe(true)
+  })
+
+  it('rejects malformed addresses and mailboxes nobody reads', () => {
+    expect(isUsableAthleteEmail('not an email')).toBe(false)
+    expect(isUsableAthleteEmail('noreply@ridgelinegear.com')).toBe(false)
+    expect(isUsableAthleteEmail('privacy@ridgelinegear.com')).toBe(false)
   })
 })
