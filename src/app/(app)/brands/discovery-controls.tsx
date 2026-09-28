@@ -1,8 +1,10 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { startDiscovery } from './actions'
+
+const REFRESH_MS = 5000
 
 interface Props {
   latestRun: {
@@ -22,6 +24,15 @@ export function DiscoveryControls({ latestRun, inFlight }: Props) {
 
   const running = inFlight
 
+  // While a run is in flight, re-fetch the page so matches appear as the job
+  // stores them. Stops once the server reports the run finished (or went
+  // stale). Plain polling — the run is minutes long and this is one page.
+  useEffect(() => {
+    if (!running) return
+    const timer = setInterval(() => router.refresh(), REFRESH_MS)
+    return () => clearInterval(timer)
+  }, [running, router])
+
   function handleClick() {
     setError(null)
     startTransition(async () => {
@@ -34,9 +45,9 @@ export function DiscoveryControls({ latestRun, inFlight }: Props) {
     <div className="flex flex-col items-end gap-1">
       <div className="flex items-center gap-3">
         {running && (
-          <button onClick={() => router.refresh()} className="text-sm text-neutral-500 underline">
-            Researching… refresh
-          </button>
+          <span className="text-sm text-neutral-500" aria-live="polite">
+            Researching brands… new matches show up here as they&apos;re found
+          </span>
         )}
         <button
           onClick={handleClick}
