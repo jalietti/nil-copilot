@@ -1,42 +1,34 @@
 import { resolveMx } from 'node:dns/promises'
 import { inngest } from '../client'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { createAnthropicClient, COPILOT_MODEL } from '@/lib/anthropic'
-import {
-  tavilySearch,
-  tavilyExtract,
-  tavilyExtractContactPages,
-  tavilyExtractWithWww,
-} from '@/lib/tavily'
+import { tavilySearch, tavilyExtract, tavilyExtractContactPages } from '@/lib/tavily'
 import {
   pageLinkDomains,
-  parseBrandEval,
-  parseBrandMentions,
   pickBrandDomain,
   planBrandCandidates,
   readablePageText,
   sourcePageUrls,
   tagsForRun,
   type BrandCandidate,
-  type BrandEval,
-  type BrandMention,
 } from '@/lib/discovery'
 import {
-  extractEmails,
-  findContactEmail,
-  needsContactLookup,
-  type ContactLookupDeps,
-} from '@/lib/contact-email'
+  DISCOVERY_LIMITS,
+  brandLookupQuery,
+  brandSearchQuery,
+  evaluateCandidate,
+  extractBrandMentions,
+} from '@/lib/discovery-research'
+import { findContactEmail, needsContactLookup, type ContactLookupDeps } from '@/lib/contact-email'
 import { track } from '@/lib/analytics'
 import * as Sentry from '@sentry/nextjs'
 
-const SEARCH_TAGS_PER_RUN = 3
-const NEW_CANDIDATES_PER_TAG = 3
-// Top search results read per tag for brand mentions (usually listicles).
-const SOURCE_PAGES_PER_TAG = 2
-const SOURCE_PAGE_CHARS = 20_000
-// "<brand> official website" searches allowed per tag to resolve mentions.
-const LOOKUPS_PER_TAG = 6
+const {
+  SEARCH_TAGS_PER_RUN,
+  NEW_CANDIDATES_PER_TAG,
+  SOURCE_PAGES_PER_TAG,
+  SOURCE_PAGE_CHARS,
+  LOOKUPS_PER_TAG,
+} = DISCOVERY_LIMITS
 // Cached brands without an email whose contact pages are re-checked per run.
 const CACHED_CONTACT_RECHECKS_PER_RUN = 3
 
@@ -133,7 +125,7 @@ export const discoverBrands = inngest.createFunction(
 
     for (const tag of tags) {
       const results = await step.run(`search-${tag}`, () =>
-        tavilySearch(`best small independent ${tag.replace(/-/g, ' ')} brands`),
+        tavilySearch(brandSearchQuery(tag)),
       )
 
       // Read the top pages and have Claude list the brands they mention —
@@ -173,7 +165,7 @@ export const discoverBrands = inngest.createFunction(
         const domain = await step.run(`lookup-${tag}-${slug}`, async () => {
           const found = pickBrandDomain(
             name,
-            await tavilySearch(`${name} official website`, { maxResults: 5 }),
+            await tavilySearch(brandLookupQuery(name), { maxResults: 5 }),
           )
           if (!found) return null
           const { data: known } = await supabase
@@ -273,147 +265,3 @@ export const discoverBrands = inngest.createFunction(
     return { brandsFound, matchesCreated }
   },
 )
-
-async function extractBrandMentions(
-  sources: { url: string; text: string }[],
-  interests: string[],
-  tag: string,
-): Promise<BrandMention[]> {
-  const client = createAnthropicClient()
-  const response = await client.messages.create({
-    model: COPILOT_MODEL,
-    max_tokens: 1024,
-    output_config: {
-      format: {
-        type: 'json_schema',
-        schema: {
-          type: 'object',
-          properties: {
-            brands: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  name: { type: 'string', description: 'The brand name only, not a product name' },
-                  url_in_page: {
-                    type: ['string', 'null'],
-                    description: "The brand's own website URL if it literally appears in the pages, else null",
-                  },
-                },
-                required: ['name', 'url_in_page'],
-                additionalProperties: false,
-              },
-            },
-          },
-          required: ['brands'],
-          additionalProperties: false,
-        },
-      },
-    },
-    messages: [
-      {
-        role: 'user',
-        content: [
-          'These web pages came up when researching brands for a student-athlete. Most are',
-          'articles or reviews; some may be a brand\'s own site. List the brands they mention',
-          'that make and sell their own products in this category.',
-          '',
-          `Category: ${tag}`,
-          `Athlete's stated interests: ${JSON.stringify(interests)}`,
-          '',
-          'Rules:',
-          '- Only brands named in the pages below. Never add brands from memory.',
-          '- Exclude retailers and marketplaces (REI, Backcountry, Amazon, etc.), publishers,',
-          '  and review sites.',
-          '- Order by fit with the athlete\'s interests; prefer smaller and independent brands',
-          '  over giant household names when both fit.',
-          '- At most 10 brands.',
-          '',
-          ...sources.flatMap((source) => [`--- page: ${source.url} ---`, source.text, '']),
-        ].join('\n'),
-      },
-    ],
-  })
-
-  const text = response.content.find((block) => block.type === 'text')?.text ?? ''
-  return parseBrandMentions(text)
-}
-
-async function evaluateCandidate(
-  url: string,
-  interests: string[],
-  tag: string,
-): Promise<{ evaluation: BrandEval; pageEmails: string[] } | null> {
-  const pages = await tavilyExtractWithWww([url])
-  const fullContent = pages[0]?.raw_content
-  const content = fullContent?.slice(0, 12_000)
-  if (!fullContent || !content) return null
-
-  const client = createAnthropicClient()
-  const response = await client.messages.create({
-    model: COPILOT_MODEL,
-    max_tokens: 1024,
-    output_config: {
-      format: {
-        type: 'json_schema',
-        schema: {
-          type: 'object',
-          properties: {
-            is_real_brand: {
-              type: 'boolean',
-              description: 'True only if this is an actual brand selling its own products',
-            },
-            name: { type: 'string' },
-            description: { type: 'string' },
-            categories: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'Lowercase kebab-case category tags for this brand',
-            },
-            contact_email: {
-              type: ['string', 'null'],
-              description: 'Partnership/general contact email found in the page content, else null. Never invent one.',
-            },
-            fit_reason: {
-              type: 'string',
-              description: 'One or two sentences on why this brand fits (or not) the athlete',
-            },
-            good_fit: { type: 'boolean' },
-          },
-          required: [
-            'is_real_brand',
-            'name',
-            'description',
-            'categories',
-            'contact_email',
-            'fit_reason',
-            'good_fit',
-          ],
-          additionalProperties: false,
-        },
-      },
-    },
-    messages: [
-      {
-        role: 'user',
-        content: [
-          'Evaluate whether this website belongs to a real brand that could be a',
-          'genuine NIL partnership fit for a student-athlete.',
-          '',
-          `Athlete's stated interests: ${JSON.stringify(interests)}`,
-          `Category being researched: ${tag}`,
-          '',
-          'Only report a contact email that literally appears in the content below.',
-          `Website: ${url}`,
-          '--- page content ---',
-          content,
-        ].join('\n'),
-      },
-    ],
-  })
-
-  const text = response.content.find((block) => block.type === 'text')?.text ?? ''
-  const evaluation = parseBrandEval(text)
-  // Footers (where emails usually live) can fall past the slice Claude sees.
-  return evaluation ? { evaluation, pageEmails: extractEmails(fullContent) } : null
-}

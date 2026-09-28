@@ -1,0 +1,30 @@
+{
+  "_note": "Sample athlete interest profiles for scripts/discovery-eval.ts. Interests and tags only — brands always come from live research.",
+  "profiles": [
+    {
+      "id": "open-water-swimmer",
+      "interests": ["open water swimming", "reef-safe sunscreen", "sustainable swimwear"],
+      "category_tags": ["open-water-swimming", "reef-safe-sunscreen", "sustainable-swimwear"]
+    },
+    {
+      "id": "trail-runner",
+      "interests": ["trail running", "ultralight running vests", "plant-based sports nutrition"],
+      "category_tags": ["trail-running", "running-vests", "plant-based-sports-nutrition"]
+    },
+    {
+      "id": "climber",
+      "interests": ["bouldering", "climbing chalk and gear", "outdoor conservation"],
+      "category_tags": ["climbing-gear", "bouldering", "sustainable-outdoor-gear"]
+    },
+    {
+      "id": "soccer-player",
+      "interests": ["soccer", "recovery tools", "sustainable sneakers"],
+      "category_tags": ["soccer-gear", "athletic-recovery-tools", "sustainable-sneakers"]
+    },
+    {
+      "id": "rower",
+      "interests": ["rowing", "sports hydration", "outdoor coffee"],
+      "category_tags": ["rowing-apparel", "electrolyte-drinks", "specialty-coffee"]
+    }
+  ]
+}

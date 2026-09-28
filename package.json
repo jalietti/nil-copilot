@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:rls": "set -a && eval \"$(npx -y supabase@2 status -o env)\" && set +a && vitest run --config vitest.integration.config.mts"
+    "test:rls": "set -a && eval \"$(npx -y supabase@2 status -o env)\" && set +a && vitest run --config vitest.integration.config.mts",
+    "eval:discovery": "tsx --env-file-if-exists=.env.local scripts/discovery-eval.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
@@ -32,6 +33,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^4.1.10"
   }

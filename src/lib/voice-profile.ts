@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { createAnthropicClient, COPILOT_MODEL } from './anthropic'
+import { createAnthropicClient, COPILOT_MAX_TOKENS, COPILOT_MODEL, responseText } from './anthropic'
 import type { InterviewInput } from './validators/interview'
 
 // A short description of how this athlete comes across — register, energy,
@@ -15,7 +15,7 @@ export async function generateVoiceProfile(input: InterviewInput): Promise<strin
   const client = createAnthropicClient()
   const response = await client.messages.create({
     model: COPILOT_MODEL,
-    max_tokens: 1024,
+    max_tokens: COPILOT_MAX_TOKENS,
     output_config: {
       format: {
         type: 'json_schema',
@@ -55,7 +55,7 @@ export async function generateVoiceProfile(input: InterviewInput): Promise<strin
     ],
   })
 
-  const text = response.content.find((block) => block.type === 'text')?.text ?? ''
+  const text = responseText(response, 'generateVoiceProfile')
   try {
     const parsed = voiceProfileSchema.safeParse(JSON.parse(text))
     return parsed.success ? parsed.data.voice_profile : null

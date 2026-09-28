@@ -1,4 +1,4 @@
-import { createAnthropicClient, COPILOT_MODEL } from './anthropic'
+import { createAnthropicClient, COPILOT_MAX_TOKENS, COPILOT_MODEL, responseText } from './anthropic'
 import { normalizedTagsSchema, type InterviewInput } from './validators/interview'
 
 // Turns the athlete's free-text interests/brands into lowercase category tags
@@ -9,7 +9,7 @@ export async function normalizeInterviewToTags(input: InterviewInput): Promise<s
 
   const response = await client.messages.create({
     model: COPILOT_MODEL,
-    max_tokens: 1024,
+    max_tokens: COPILOT_MAX_TOKENS,
     output_config: {
       format: {
         type: 'json_schema',
@@ -45,7 +45,7 @@ export async function normalizeInterviewToTags(input: InterviewInput): Promise<s
     ],
   })
 
-  const text = response.content.find((block) => block.type === 'text')?.text ?? ''
+  const text = responseText(response, 'normalizeInterviewToTags')
   try {
     const parsed = normalizedTagsSchema.safeParse(JSON.parse(text))
     if (parsed.success) {

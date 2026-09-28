@@ -5,8 +5,10 @@
 | `npm run test` | Unit tests + database tests (`tests/db/`) | Nothing — runs anywhere |
 | `npm run test:rls` | API-level RLS isolation tests (`tests/integration/`) | A running local Supabase |
 | `npm run lint` / `npm run build` | ESLint / production build + typecheck | Nothing |
+| `npm run eval:discovery` | Discovery quality check against sample profiles (live, costs credits) | `TAVILY_API_KEY`, `ANTHROPIC_API_KEY` |
 
-CI (`.github/workflows/ci.yml`) runs all of them on every push and PR.
+CI (`.github/workflows/ci.yml`) runs test, test:rls, lint, and build on every push and PR.
+`eval:discovery` is run by hand (it spends real API credits).
 
 ## Database tests (`tests/db/`, part of `npm run test`)
 
@@ -46,4 +48,21 @@ variables from `npx supabase status -o env` (`API_URL`, `ANON_KEY`,
 ```bash
 docker exec supabase_db_nil-copilot psql -U postgres \
   -c "insert into invite_codes (code, label) values ('LOCALDEV1', 'local dev')"
+```
+
+## Discovery quality check (`npm run eval:discovery`)
+
+Runs the live discovery pipeline (the same helpers the Inngest job uses, from
+`src/lib/discovery-research.ts`) for the sample athlete profiles in
+`scripts/discovery-eval-profiles.json`, with no database writes, and reports
+per interest tag: pages read, brands mentioned, candidates, real brands, good
+fits, and good fits with a validated contact email — plus a summary
+(`matchesPerTag`, `emailRate`, `tagsWithZeroMatches`) and external call counts.
+Run it before and after any discovery change; it spends real Tavily +
+Anthropic credits (about one discovery run's worth per tag).
+
+```bash
+npm run eval:discovery                        # 1 tag per profile
+npm run eval:discovery -- --tags 3 --out report.json
+npm run eval:discovery -- --only climber
 ```

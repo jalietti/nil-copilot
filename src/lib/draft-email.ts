@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { createAnthropicClient, COPILOT_MODEL } from './anthropic'
+import { createAnthropicClient, COPILOT_MAX_TOKENS, COPILOT_MODEL, responseText } from './anthropic'
 import {
   COMPENSATION_ASK_LABELS,
   followerTier,
@@ -59,11 +59,11 @@ async function draft(prompt: string): Promise<EmailDraft> {
   const client = createAnthropicClient()
   const response = await client.messages.create({
     model: COPILOT_MODEL,
-    max_tokens: 2048,
+    max_tokens: COPILOT_MAX_TOKENS,
     output_config: EMAIL_OUTPUT_CONFIG,
     messages: [{ role: 'user', content: prompt }],
   })
-  const text = response.content.find((block) => block.type === 'text')?.text ?? ''
+  const text = responseText(response, 'draftEmail')
   const parsed = emailDraftSchema.safeParse(JSON.parse(text))
   if (!parsed.success) throw new Error('Draft did not match the expected shape')
   return parsed.data
