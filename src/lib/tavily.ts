@@ -60,12 +60,20 @@ export async function tavilyExtractWithWww(
   return [...pages, ...(await tavilyExtract(retry)).filter((page) => page.raw_content)]
 }
 
-// Where brands usually list a contact address: /contact and /about, plus the
-// common variants (/contact-us, and Shopify's /pages/contact). Pages that
-// don't exist just come back absent; one extract call covers them all.
-const CONTACT_PATHS = ['/contact', '/contact-us', '/pages/contact', '/about']
+// Where brands list a contact address: pages the homepage links to (best
+// first, see contactPageLinks), then the usual paths (/contact, /contact-us,
+// Shopify's /pages/contact(-us), /about). One extract call, capped so the
+// cost stays at about one extract credit per brand.
+const CONTACT_PATHS = ['/contact', '/contact-us', '/pages/contact', '/pages/contact-us', '/about']
+const MAX_CONTACT_PAGES = 6
 
-export async function tavilyExtractContactPages(domain: string): Promise<string[]> {
-  const pages = await tavilyExtractWithWww(CONTACT_PATHS.map((path) => `https://${domain}${path}`))
+export async function tavilyExtractContactPages(
+  domain: string,
+  linkedPages: string[] = [],
+): Promise<string[]> {
+  const urls = [
+    ...new Set([...linkedPages, ...CONTACT_PATHS.map((path) => `https://${domain}${path}`)]),
+  ].slice(0, MAX_CONTACT_PAGES)
+  const pages = await tavilyExtractWithWww(urls)
   return pages.map((page) => page.raw_content)
 }

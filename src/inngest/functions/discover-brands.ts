@@ -1,7 +1,12 @@
 import { resolveMx } from 'node:dns/promises'
 import { inngest } from '../client'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { tavilySearch, tavilyExtract, tavilyExtractContactPages } from '@/lib/tavily'
+import {
+  tavilySearch,
+  tavilyExtract,
+  tavilyExtractContactPages,
+  tavilyExtractWithWww,
+} from '@/lib/tavily'
 import {
   pageLinkDomains,
   pickBrandDomain,
@@ -18,7 +23,13 @@ import {
   evaluateCandidate,
   extractBrandMentions,
 } from '@/lib/discovery-research'
-import { findContactEmail, needsContactLookup, type ContactLookupDeps } from '@/lib/contact-email'
+import {
+  contactPageLinks,
+  extractEmails,
+  findContactEmail,
+  needsContactLookup,
+  type ContactLookupDeps,
+} from '@/lib/contact-email'
 import { track } from '@/lib/analytics'
 import * as Sentry from '@sentry/nextjs'
 
@@ -110,7 +121,14 @@ export const discoverBrands = inngest.createFunction(
       .slice(0, CACHED_CONTACT_RECHECKS_PER_RUN)
     for (const brand of due) {
       await step.run(`recheck-contact-${brand.domain}`, async () => {
-        const { email } = await findContactEmail(brand.domain, [], contactDeps)
+        // The homepage's own emails and the contact pages it links to.
+        const home = (await tavilyExtractWithWww([`https://${brand.domain}`]))[0]?.raw_content ?? ''
+        const { email } = await findContactEmail(
+          brand.domain,
+          extractEmails(home),
+          contactDeps,
+          contactPageLinks(home, brand.domain),
+        )
         await supabase
           .from('brands')
           .update({ contact_email: email, contact_checked_at: new Date().toISOString() })
@@ -193,6 +211,7 @@ export const discoverBrands = inngest.createFunction(
             candidate.domain,
             [evaluation.contact_email, ...evaluated.pageEmails],
             contactDeps,
+            evaluated.contactLinks,
           ),
         )
 

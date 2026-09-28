@@ -1,6 +1,6 @@
 import { createAnthropicClient, COPILOT_MAX_TOKENS, COPILOT_MODEL, responseText } from './anthropic'
 import { tavilyExtractWithWww } from './tavily'
-import { extractEmails } from './contact-email'
+import { contactPageLinks, extractEmails } from './contact-email'
 import { parseBrandEval, parseBrandMentions, type BrandEval, type BrandMention } from './discovery'
 
 // The Claude-backed research steps of brand discovery. Shared by the Inngest
@@ -95,7 +95,7 @@ export async function evaluateCandidate(
   url: string,
   interests: string[],
   tag: string,
-): Promise<{ evaluation: BrandEval; pageEmails: string[] } | null> {
+): Promise<{ evaluation: BrandEval; pageEmails: string[]; contactLinks: string[] } | null> {
   const pages = await tavilyExtractWithWww([url])
   const fullContent = pages[0]?.raw_content
   const content = fullContent?.slice(0, 12_000)
@@ -167,5 +167,10 @@ export async function evaluateCandidate(
   const text = responseText(response, 'evaluateCandidate')
   const evaluation = parseBrandEval(text)
   // Footers (where emails usually live) can fall past the slice Claude sees.
-  return evaluation ? { evaluation, pageEmails: extractEmails(fullContent) } : null
+  if (!evaluation) return null
+  return {
+    evaluation,
+    pageEmails: extractEmails(fullContent),
+    contactLinks: contactPageLinks(fullContent, new URL(url).hostname.replace(/^www\./, '')),
+  }
 }

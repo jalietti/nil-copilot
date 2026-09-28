@@ -1,0 +1,31 @@
+{
+  "_note": "Real brand domains surfaced by past discovery runs, used only to measure contact-email finding (npm run eval:discovery -- --contacts scripts/contact-eval-domains.json). Not used by the app.",
+  "domains": [
+    "4endurance.com",
+    "alpkit.com",
+    "blueseventy.com",
+    "boathouse.com",
+    "diadora.com",
+    "districtvision.com",
+    "finisterre.com",
+    "g-form.com",
+    "hammernutrition.com",
+    "jlracing.com.au",
+    "maurten.com",
+    "nakedsportsinnovations.com",
+    "nnormal.com",
+    "organicclimbing.com",
+    "outdoorswimmingsociety.com",
+    "projectreef.com",
+    "raideresearch.com",
+    "satisfyrunning.com",
+    "sendclimbing.com",
+    "soarrunning.com",
+    "storelli.com",
+    "sustainabletravel.org",
+    "swimoutlet.com",
+    "swimtrek.com",
+    "territoryrun.co",
+    "ultraspire.com"
+  ]
+}

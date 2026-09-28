@@ -95,6 +95,42 @@ export function isUsableAthleteEmail(email: string): boolean {
   return !BLOCKED_LOCAL_PARTS.has(email.split('@')[0].split('+')[0])
 }
 
+// Pages linked from a brand's homepage that are likely to list a contact
+// address, best first. Brands link their real contact page (often
+// /pages/support or /pages/contact-us on Shopify), which guessing /contact
+// misses. Same-site links only; images and other assets are skipped.
+const CONTACT_LINK_RANKS: RegExp[] = [
+  /contact|get in touch|email us/i,
+  /partner|collab|ambassador|athlete|affiliate|influencer|sponsor|team/i,
+  /press|media/i,
+  /about|our story/i,
+  /support|help|faq|customer/i,
+]
+
+export function contactPageLinks(homepageMarkdown: string, domain: string): string[] {
+  const root = domain.toLowerCase()
+  const ranked: { url: string; rank: number; index: number }[] = []
+  let index = 0
+  for (const match of homepageMarkdown.matchAll(/\[([^\]]{0,80})\]\(([^)\s]+)\)/g)) {
+    const [, text, href] = match
+    let url: URL
+    try {
+      url = new URL(href, `https://${root}`)
+    } catch {
+      continue
+    }
+    const host = url.hostname.toLowerCase().replace(/^www\./, '')
+    if (host !== root && !host.endsWith(`.${root}`)) continue
+    if (/\.(?:png|jpe?g|gif|webp|svg|avif|css|js|pdf)$/i.test(url.pathname)) continue
+    if (url.pathname.includes('/cdn/') || url.pathname === '/') continue
+    const rank = CONTACT_LINK_RANKS.findIndex((re) => re.test(`${text} ${url.pathname}`))
+    if (rank === -1) continue
+    ranked.push({ url: `https://${root}${url.pathname}`, rank, index: index++ })
+  }
+  ranked.sort((a, b) => a.rank - b.rank || a.index - b.index)
+  return [...new Set(ranked.map((r) => r.url))]
+}
+
 export type MxResolver = (domain: string) => Promise<{ exchange: string }[]>
 
 // Syntax + at least one MX record. DNS failures count as invalid.
@@ -109,8 +145,9 @@ export async function hasValidMx(email: string, resolveMx: MxResolver): Promise<
 }
 
 export interface ContactLookupDeps {
-  // Plain text of the brand's contact/about pages (whatever loads).
-  fetchContactPages: (domain: string) => Promise<string[]>
+  // Plain text of the brand's contact/about pages (whatever loads), trying
+  // `linkedPages` (from the homepage) before the usual guessed paths.
+  fetchContactPages: (domain: string, linkedPages: string[]) => Promise<string[]>
   resolveMx: MxResolver
 }
 
@@ -126,6 +163,7 @@ export async function findContactEmail(
   domain: string,
   initialCandidates: (string | null | undefined)[],
   deps: ContactLookupDeps,
+  linkedPages: string[] = [],
 ): Promise<ContactLookupResult> {
   const mxCache = new Map<string, Promise<boolean>>()
   const validate = (email: string) => {
@@ -143,7 +181,7 @@ export async function findContactEmail(
   const fromHomepage = await firstValid(initialCandidates.filter((c): c is string => !!c))
   if (fromHomepage) return { email: fromHomepage, fetchedPages: false }
 
-  const pages = await deps.fetchContactPages(domain)
+  const pages = await deps.fetchContactPages(domain, linkedPages)
   const fromPages = await firstValid(pages.flatMap(extractEmails))
   return { email: fromPages, fetchedPages: true }
 }

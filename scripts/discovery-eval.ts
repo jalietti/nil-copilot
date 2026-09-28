@@ -11,11 +11,19 @@
 //   npm run eval:discovery                       # 1 tag per profile
 //   npm run eval:discovery -- --tags 3           # up to 3 tags per profile
 //   npm run eval:discovery -- --only climber --out report.json
+//   npm run eval:discovery -- --contacts scripts/contact-eval-domains.json
+//     (email finding only, on a fixed domain list: no Claude calls, and
+//     before/after comparisons aren't skewed by varying search results)
 
 import { readFileSync, writeFileSync } from 'node:fs'
 import { resolveMx } from 'node:dns/promises'
 import { parseArgs } from 'node:util'
-import { tavilyExtract, tavilyExtractContactPages, tavilySearch } from '@/lib/tavily'
+import {
+  tavilyExtract,
+  tavilyExtractContactPages,
+  tavilyExtractWithWww,
+  tavilySearch,
+} from '@/lib/tavily'
 import {
   pageLinkDomains,
   pickBrandDomain,
@@ -32,7 +40,7 @@ import {
   evaluateCandidate,
   extractBrandMentions,
 } from '@/lib/discovery-research'
-import { findContactEmail } from '@/lib/contact-email'
+import { contactPageLinks, extractEmails, findContactEmail } from '@/lib/contact-email'
 
 interface Profile {
   id: string
@@ -114,6 +122,7 @@ async function researchTag(profile: Profile, tag: string, seen: Set<string>): Pr
       candidate.domain,
       [evaluated.evaluation.contact_email, ...evaluated.pageEmails],
       { fetchContactPages: tavilyExtractContactPages, resolveMx },
+      evaluated.contactLinks,
     )
     if (contact.fetchedPages) calls.tavilyExtract++
     result.brands.push({
@@ -142,6 +151,28 @@ function summarize(rows: TagResult[]) {
   }
 }
 
+// Contact-email finding alone, as discovery does it after a brand is judged
+// real: homepage emails first, then the brand's contact/about pages.
+async function evaluateContacts(file: string) {
+  const { domains } = JSON.parse(readFileSync(file, 'utf8')) as { domains: string[] }
+  let found = 0
+  for (const domain of domains) {
+    calls.tavilyExtract++
+    const home = (await tavilyExtractWithWww([`https://${domain}`]))[0]?.raw_content ?? ''
+    const contact = await findContactEmail(
+      domain,
+      extractEmails(home),
+      { fetchContactPages: tavilyExtractContactPages, resolveMx },
+      contactPageLinks(home, domain),
+    )
+    if (contact.fetchedPages) calls.tavilyExtract++
+    if (contact.email) found++
+    console.log(`${domain.padEnd(32)} ${home ? 'home ok ' : 'home ✗  '} ${contact.email ?? '—'}`)
+  }
+  console.log(`\nEmail found for ${found}/${domains.length} (${Math.round((found / domains.length) * 100)}%)`)
+  console.log('External calls', calls)
+}
+
 async function main() {
   const { values } = parseArgs({
     options: {
@@ -149,11 +180,13 @@ async function main() {
       tags: { type: 'string', default: '1' },
       only: { type: 'string' },
       out: { type: 'string' },
+      contacts: { type: 'string' },
     },
   })
   for (const key of ['TAVILY_API_KEY', 'ANTHROPIC_API_KEY']) {
     if (!process.env[key]) throw new Error(`${key} is not set (put it in .env.local)`)
   }
+  if (values.contacts) return evaluateContacts(values.contacts)
 
   const { profiles } = JSON.parse(readFileSync(values.profiles!, 'utf8')) as { profiles: Profile[] }
   const tagsPerProfile = Math.max(1, Number(values.tags))

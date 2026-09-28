@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import {
   CONTACT_RECHECK_MS,
+  contactPageLinks,
   extractEmails,
   findContactEmail,
   hasValidMx,
@@ -105,7 +106,7 @@ describe('findContactEmail', () => {
       fetchContactPages,
       resolveMx: mx,
     })
-    expect(fetchContactPages).toHaveBeenCalledWith('ridgelinegear.com')
+    expect(fetchContactPages).toHaveBeenCalledWith('ridgelinegear.com', [])
     expect(result).toEqual({ email: 'partnerships@ridgelinegear.com', fetchedPages: true })
   })
 
@@ -152,5 +153,32 @@ describe('isUsableAthleteEmail', () => {
     expect(isUsableAthleteEmail('not an email')).toBe(false)
     expect(isUsableAthleteEmail('noreply@ridgelinegear.com')).toBe(false)
     expect(isUsableAthleteEmail('privacy@ridgelinegear.com')).toBe(false)
+  })
+})
+
+describe('contactPageLinks', () => {
+  const homepage = readFileSync(join(__dirname, 'fixtures', 'brand-homepage.md'), 'utf8')
+
+  it("ranks the brand's own contact-ish pages: contact, partnerships, press, about, help", () => {
+    expect(contactPageLinks(homepage, 'ridgelinegear.com')).toEqual([
+      'https://ridgelinegear.com/pages/contact-us',
+      'https://ridgelinegear.com/pages/ambassadors',
+      'https://ridgelinegear.com/pages/press',
+      'https://ridgelinegear.com/pages/our-story',
+      'https://ridgelinegear.com/pages/faqs',
+    ])
+  })
+
+  it('skips other sites, assets, and unrelated pages', () => {
+    const links = contactPageLinks(homepage, 'ridgelinegear.com')
+    expect(links.join(' ')).not.toMatch(/rei\.com|instagram|\.svg|\.png|collections|shipping/)
+  })
+
+  it('passes linked pages through to the contact-page fetch', async () => {
+    const fetchContactPages = vi.fn(async () => ['Reach us at hello@ridgelinegear.com'])
+    const links = contactPageLinks(homepage, 'ridgelinegear.com')
+    const result = await findContactEmail('ridgelinegear.com', [], { fetchContactPages, resolveMx: mx }, links)
+    expect(fetchContactPages).toHaveBeenCalledWith('ridgelinegear.com', links)
+    expect(result.email).toBe('hello@ridgelinegear.com')
   })
 })
