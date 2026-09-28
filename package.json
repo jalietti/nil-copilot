@@ -15,7 +15,11 @@
     "db:reset": "npx -y supabase@2 db reset",
     "test:e2e": "playwright test",
     "pilot:report": "tsx --env-file-if-exists=.env.local scripts/pilot-report.ts",
-    "usage:report": "tsx --env-file-if-exists=.env.local scripts/usage-report.ts"
+    "usage:report": "tsx --env-file-if-exists=.env.local scripts/usage-report.ts",
+    "pilot:db-push": "bash scripts/pilot/db-push.sh",
+    "pilot:vercel-env": "bash scripts/pilot/vercel-env.sh",
+    "pilot:invites": "tsx scripts/pilot/mint-invites.ts",
+    "pilot:verify": "tsx scripts/pilot/verify-prod.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

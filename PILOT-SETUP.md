@@ -9,6 +9,15 @@ reuse a key from `.env.local` or local development.
 You'll need: the GitHub repo (`jalietti/nil-copilot`), Node 24, and accounts
 at Vercel, Supabase, Inngest, Sentry, PostHog, Anthropic, and Tavily.
 
+**Shortcuts** (after `npx supabase login` and `npx vercel login` once):
+
+| Command | Replaces |
+| --- | --- |
+| `npm run pilot:db-push -- <ref>` (`--adopt-existing` if 0001 was applied by hand) | Step 2's link + push |
+| `npm run pilot:vercel-env -- <prod-ref>` | Step 7: fetches the Supabase values, prompts (hidden) for the rest |
+| `npm run pilot:invites -- <prod-ref>` | Step 8's SQL |
+| `npm run pilot:verify -- --url <app url> --project-ref <prod-ref>` | Most of step 9: pages, security headers, email confirmation, Inngest keys, migrations, anon lockout |
+
 ---
 
 ## 1. Create the Vercel project (don't deploy yet)
