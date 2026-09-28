@@ -32,10 +32,11 @@ jobs:
           cache: npm
       - run: npm ci
       # Only the services the tests use: Postgres (with every migration
-      # applied), Auth, and PostgREST behind Kong.
+      # applied), Auth, PostgREST behind Kong, and Mailpit (the e2e signup
+      # reads the confirmation email from it).
       - run: >-
           npx -y supabase@2 start -x
-          studio,storage-api,realtime,imgproxy,edge-runtime,logflare,vector,postgres-meta,supavisor,mailpit
+          studio,storage-api,realtime,imgproxy,edge-runtime,logflare,vector,postgres-meta,supavisor
       - run: npm run test:rls
       # Browser tests of the core flow against a production build, the local
       # stack (reset to supabase/seed.sql), and a mock Anthropic API.
