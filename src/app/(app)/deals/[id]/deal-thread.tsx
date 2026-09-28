@@ -7,6 +7,7 @@ import {
   generateCounterDraft,
   generateOutreachDraft,
   markSent,
+  recordMailtoClick,
   saveBrandReply,
   saveDraftEdits,
   setDealStatus,
@@ -105,6 +106,12 @@ export function DealThread({ dealId, dealStatus, brandName, contactEmail, messag
               {contactEmail ? (
                 <a
                   href={buildMailtoUrl({ to: contactEmail, subject, body })}
+                  onClick={() => {
+                    const kind = messages.some((m) => m.direction === 'inbound_pasted')
+                      ? 'counter'
+                      : 'outreach'
+                    void recordMailtoClick(dealId, kind)
+                  }}
                   className="rounded bg-black px-3 py-1.5 text-sm text-white"
                 >
                   Open in your email app

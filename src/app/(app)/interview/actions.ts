@@ -1,9 +1,12 @@
 'use server'
 
 import { redirect } from 'next/navigation'
+import { after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { interviewSchema } from '@/lib/validators/interview'
 import { normalizeInterviewToTags } from '@/lib/normalize-interview'
+import { track } from '@/lib/analytics'
+import { reportError } from '@/lib/observability/sentry'
 
 export interface InterviewActionResult {
   error?: string
@@ -24,7 +27,8 @@ export async function submitInterview(raw: unknown): Promise<InterviewActionResu
   let categoryTags: string[]
   try {
     categoryTags = await normalizeInterviewToTags(parsed.data)
-  } catch {
+  } catch (e) {
+    reportError(e, { action: 'normalizeInterviewToTags' })
     // Claude unavailable — save with raw interests as tags rather than losing answers.
     categoryTags = parsed.data.interests.map((i) => i.toLowerCase().replace(/\s+/g, '-'))
   }
@@ -48,5 +52,7 @@ export async function submitInterview(raw: unknown): Promise<InterviewActionResu
     : await supabase.from('interviews').insert({ athlete_id: user.id, ...row })
 
   if (error) return { error: error.message }
+  const athleteId = user.id
+  after(() => track('interview_completed', athleteId, { first_time: !existing }))
   redirect('/brands')
 }

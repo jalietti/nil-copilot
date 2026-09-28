@@ -2,9 +2,12 @@
 
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
+import { after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { inngest } from '@/inngest/client'
+import { track } from '@/lib/analytics'
+import { reportError } from '@/lib/observability/sentry'
 import {
   DISCOVERY_BLOCK_MESSAGES,
   dailyWindowStart,
@@ -71,7 +74,8 @@ export async function startDiscovery(): Promise<StartDiscoveryResult> {
       name: 'app/discover-brands.requested',
       data: { athleteId: user.id, runId: run.id },
     })
-  } catch {
+  } catch (e) {
+    reportError(e, { action: 'startDiscovery' })
     // Never leave a queued row behind for a job that was never enqueued.
     await createAdminClient()
       .from('discovery_runs')
@@ -80,13 +84,27 @@ export async function startDiscovery(): Promise<StartDiscoveryResult> {
     return { ok: false, reason: 'error', message: 'Could not start discovery — try again' }
   }
 
+  after(() => track('discovery_run_started', user.id, { run_id: run.id }))
   revalidatePath('/brands')
   return { ok: true }
 }
 
 export async function dismissMatch(matchId: string): Promise<void> {
   const supabase = await createClient()
-  await supabase.from('brand_matches').update({ status: 'dismissed' }).eq('id', matchId)
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: match } = await supabase
+    .from('brand_matches')
+    .update({ status: 'dismissed' })
+    .eq('id', matchId)
+    .select('brand_id')
+    .maybeSingle()
+  if (match) {
+    after(() => track('match_dismissed', user.id, { match_id: matchId, brand_id: match.brand_id }))
+  }
   revalidatePath('/brands')
 }
 
@@ -121,6 +139,10 @@ export async function startDeal(matchId: string): Promise<{ error?: string }> {
     if (error) return { error: error.message }
     dealId = deal.id
     await supabase.from('brand_matches').update({ status: 'drafting' }).eq('id', matchId)
+    const newDealId = deal.id
+    after(() =>
+      track('deal_status_changed', user.id, { deal_id: newDealId, from: 'none', to: 'draft' }),
+    )
   }
 
   redirect(`/deals/${dealId}`)

@@ -3,6 +3,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createAnthropicClient, COPILOT_MODEL } from '@/lib/anthropic'
 import { tavilySearch, tavilyExtract } from '@/lib/tavily'
 import { candidateDomains, parseBrandEval, type BrandEval } from '@/lib/discovery'
+import { track } from '@/lib/analytics'
+import * as Sentry from '@sentry/nextjs'
 
 const SEARCH_TAGS_PER_RUN = 3
 const NEW_CANDIDATES_PER_TAG = 3
@@ -12,7 +14,22 @@ const NEW_CANDIDATES_PER_TAG = 3
 // Inngest function because a full run (searches + page reads + evals) far
 // exceeds a serverless request window. Every external call is a retryable step.
 export const discoverBrands = inngest.createFunction(
-  { id: 'discover-brands', retries: 2, triggers: [{ event: 'app/discover-brands.requested' }] },
+  {
+    id: 'discover-brands',
+    retries: 2,
+    triggers: [{ event: 'app/discover-brands.requested' }],
+    // After all retries are exhausted: record the failure on the run (so the
+    // athlete isn't left looking at "Researching…") and report it.
+    onFailure: async ({ event, error }) => {
+      const { runId } = event.data.event.data as { runId: string }
+      await createAdminClient()
+        .from('discovery_runs')
+        .update({ status: 'failed', error: 'Job failed', finished_at: new Date().toISOString() })
+        .eq('id', runId)
+      Sentry.captureException(error, { tags: { inngest_function: 'discover-brands' } })
+      await Sentry.flush(2000)
+    },
+  },
   async ({ event, step }) => {
     const { athleteId, runId } = event.data as { athleteId: string; runId: string }
     const supabase = createAdminClient()
@@ -32,14 +49,14 @@ export const discoverBrands = inngest.createFunction(
     })
 
     // 1. Cache first: match existing verified brands by category overlap.
-    const cachedMatchCount = await step.run('match-from-cache', async () => {
+    const cachedMatchIds = await step.run('match-from-cache', async () => {
       const { data: cached } = await supabase
         .from('brands')
         .select('id, domain')
         .overlaps('categories', interview.category_tags)
         .not('verified_at', 'is', null)
         .limit(20)
-      if (!cached || cached.length === 0) return 0
+      if (!cached || cached.length === 0) return []
       const { error } = await supabase.from('brand_matches').upsert(
         cached.map((b) => ({
           athlete_id: athleteId,
@@ -49,13 +66,13 @@ export const discoverBrands = inngest.createFunction(
         { onConflict: 'athlete_id,brand_id', ignoreDuplicates: true },
       )
       if (error) throw new Error(error.message)
-      return cached.length
+      return cached.map((b) => b.id)
     })
 
     // 2. Live research per category tag.
     const tags = interview.category_tags.slice(0, SEARCH_TAGS_PER_RUN)
     let brandsFound = 0
-    let matchesCreated = cachedMatchCount
+    const matchedBrandIds = [...cachedMatchIds]
 
     for (const tag of tags) {
       const results = await step.run(`search-${tag}`, () =>
@@ -104,14 +121,15 @@ export const discoverBrands = inngest.createFunction(
             )
             if (matchError) throw new Error(matchError.message)
           }
-          return { matched: evaluation.good_fit }
+          return { brandId: brand.id, matched: evaluation.good_fit }
         })
 
         brandsFound += 1
-        if (stored.matched) matchesCreated += 1
+        if (stored.matched) matchedBrandIds.push(stored.brandId)
       }
     }
 
+    const matchesCreated = matchedBrandIds.length
     await step.run('finish-run', async () => {
       await supabase
         .from('discovery_runs')
@@ -122,6 +140,19 @@ export const discoverBrands = inngest.createFunction(
           finished_at: new Date().toISOString(),
         })
         .eq('id', runId)
+
+      // A match is only actionable if there's somewhere to send the outreach.
+      const { count } = await supabase
+        .from('brands')
+        .select('id', { count: 'exact', head: true })
+        .in('id', matchedBrandIds)
+        .not('contact_email', 'is', null)
+      await track('discovery_run_completed', athleteId, {
+        run_id: runId,
+        brands_found: brandsFound,
+        matches_created: matchesCreated,
+        matches_with_email: count ?? 0,
+      })
     })
 
     return { brandsFound, matchesCreated }

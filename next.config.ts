@@ -1,10 +1,12 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs/config";
 
 const isDev = process.env.NODE_ENV === "development";
 
 // Origins the browser legitimately talks to. Supabase comes from the project
-// URL (auth + PostgREST from client components); Sentry and PostHog ingest
-// hosts are region-dependent subdomains, so they're allowed by parent domain.
+// URL (auth + PostgREST from client components); Sentry's ingest host is a
+// region-dependent subdomain, so it's allowed by parent domain. PostHog is
+// server-side only and needs nothing here.
 const supabaseOrigin = process.env.NEXT_PUBLIC_SUPABASE_URL
   ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin
   : "";
@@ -14,16 +16,15 @@ const csp = [
   "default-src 'self'",
   // 'unsafe-inline' is required for Next's inline hydration scripts without
   // per-request nonces; 'unsafe-eval' only in dev (React debug tooling).
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} https://*.posthog.com`,
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://*.posthog.com",
+  "img-src 'self' data: blob:",
   "font-src 'self'",
   [
     "connect-src 'self'",
     supabaseOrigin,
     supabaseWs,
     "https://*.sentry.io",
-    "https://*.posthog.com",
     isDev ? "ws://localhost:* ws://127.0.0.1:*" : "",
   ]
     .filter(Boolean)
@@ -53,4 +54,13 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Source maps upload only when SENTRY_AUTH_TOKEN is set (production builds on
+// Vercel); everywhere else the wrapper is inert.
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+  silent: !process.env.CI,
+  telemetry: false,
+});
