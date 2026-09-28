@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -18,7 +19,10 @@ export const metadata: Metadata = {
     "NIL deals that fit who you are — drafted by a copilot, always sent by you.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // Every page renders per request so Next can stamp the CSP nonce on its
+  // scripts (src/proxy.ts). A prerendered page would ship un-nonced scripts.
+  await connection();
   return (
     <html
       lang="en"

@@ -1,46 +1,9 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs/config";
 
-const isDev = process.env.NODE_ENV === "development";
-
-// Origins the browser legitimately talks to. Supabase comes from the project
-// URL (auth + PostgREST from client components); Sentry's ingest host is a
-// region-dependent subdomain, so it's allowed by parent domain. PostHog is
-// server-side only and needs nothing here.
-const supabaseOrigin = process.env.NEXT_PUBLIC_SUPABASE_URL
-  ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin
-  : "";
-const supabaseWs = supabaseOrigin.replace(/^http/, "ws");
-
-const csp = [
-  "default-src 'self'",
-  // 'unsafe-inline' is required for Next's inline hydration scripts without
-  // per-request nonces; 'unsafe-eval' only in dev (React debug tooling).
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
-  "font-src 'self'",
-  [
-    "connect-src 'self'",
-    supabaseOrigin,
-    supabaseWs,
-    "https://*.sentry.io",
-    isDev ? "ws://localhost:* ws://127.0.0.1:*" : "",
-  ]
-    .filter(Boolean)
-    .join(" "),
-  "worker-src 'self' blob:",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-  isDev ? "" : "upgrade-insecure-requests",
-]
-  .filter(Boolean)
-  .join("; ");
-
+// Content-Security-Policy is set per request with a nonce in src/proxy.ts
+// (src/lib/csp.ts); these are the static security headers.
 const securityHeaders = [
-  { key: "Content-Security-Policy", value: csp },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },

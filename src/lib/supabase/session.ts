@@ -3,9 +3,19 @@ import { NextResponse, type NextRequest } from 'next/server'
 import type { Database } from './types'
 
 // Refreshes the auth session on every request. Called from src/proxy.ts
-// (Next 16's replacement for middleware.ts).
-export async function updateSession(request: NextRequest) {
-  let response = NextResponse.next({ request })
+// (Next 16's replacement for middleware.ts). `forwardHeaders` are added to the
+// request passed on to rendering (the CSP nonce); they're applied after any
+// refreshed session cookies so those still reach server components.
+export async function updateSession(
+  request: NextRequest,
+  forwardHeaders: Record<string, string> = {},
+) {
+  const next = () => {
+    const headers = new Headers(request.headers)
+    for (const [key, value] of Object.entries(forwardHeaders)) headers.set(key, value)
+    return NextResponse.next({ request: { headers } })
+  }
+  let response = next()
 
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,7 +27,7 @@ export async function updateSession(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          response = NextResponse.next({ request })
+          response = next()
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options),
           )
