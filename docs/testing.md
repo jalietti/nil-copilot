@@ -4,10 +4,11 @@
 | --- | --- | --- |
 | `npm run test` | Unit tests + database tests (`tests/db/`) | Nothing — runs anywhere |
 | `npm run test:rls` | API-level RLS isolation tests (`tests/integration/`) | A running local Supabase |
+| `npm run test:e2e` | Browser tests of the core flow (`tests/e2e/`) — **resets the local database to the seed** | A running local Supabase; `npx playwright install chromium` once |
 | `npm run lint` / `npm run build` | ESLint / production build + typecheck | Nothing |
 | `npm run eval:discovery` | Discovery quality check against sample profiles (live, costs credits) | `TAVILY_API_KEY`, `ANTHROPIC_API_KEY` |
 
-CI (`.github/workflows/ci.yml`) runs test, test:rls, lint, and build on every push and PR.
+CI (`.github/workflows/ci.yml`) runs test, test:rls, test:e2e, lint, and build on every push and PR.
 `eval:discovery` is run by hand (it spends real API credits).
 
 ## Database tests (`tests/db/`, part of `npm run test`)
@@ -36,6 +37,19 @@ npm run test:rls
 `npx supabase stop` shuts the stack down. The tests create their own invite
 code and throwaway users, so they can run against a stack you're also using
 for local development.
+
+## End-to-end tests (`npm run test:e2e`)
+
+Playwright drives Chromium through the core athlete flow against a production
+build of the app (`scripts/e2e-server.sh`, port 3400), the local Supabase
+stack, and a mock Anthropic API (`tests/e2e/mock-anthropic.mjs`, which
+returns canned drafts/profiles/tags so no API keys or credits are needed):
+invite-gated signup -> email confirmation (via Mailpit) -> onboarding visa
+step -> interview consent; and, as the seeded athlete, the dashboard
+follow-up prompt -> draft outreach -> try another version -> edit -> sent ->
+paste reply -> counter draft -> "I'm done". Every page is checked for CSP
+violations. Discovery isn't covered (it needs Tavily + Inngest; see the unit
+tests and `eval:discovery`). Each run resets the local database first.
 
 ## Local app against the local stack (design + manual testing)
 

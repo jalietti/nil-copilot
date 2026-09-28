@@ -12,7 +12,8 @@
     "test:rls": "set -a && eval \"$(npx -y supabase@2 status -o env)\" && set +a && vitest run --config vitest.integration.config.mts",
     "eval:discovery": "tsx --env-file-if-exists=.env.local scripts/discovery-eval.ts",
     "dev:local": "bash scripts/dev-local.sh",
-    "db:reset": "npx -y supabase@2 db reset"
+    "db:reset": "npx -y supabase@2 db reset",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
@@ -28,6 +29,7 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

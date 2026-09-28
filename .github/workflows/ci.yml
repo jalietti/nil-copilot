@@ -21,8 +21,8 @@ jobs:
       - run: npm run test
       - run: npm run build
 
-  rls:
-    name: RLS isolation (real Supabase)
+  integration:
+    name: RLS isolation + end-to-end (real Supabase)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,3 +37,12 @@ jobs:
           npx -y supabase@2 start -x
           studio,storage-api,realtime,imgproxy,edge-runtime,logflare,vector,postgres-meta,supavisor,mailpit
       - run: npm run test:rls
+      # Browser tests of the core flow against a production build, the local
+      # stack (reset to supabase/seed.sql), and a mock Anthropic API.
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: test-results/
