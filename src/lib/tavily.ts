@@ -46,12 +46,26 @@ export async function tavilyExtract(
   return data.results ?? []
 }
 
+// Some sites only answer on www. (the bare domain fails to fetch). Brand URLs
+// here are built from bare domains, so retry just the failures with www.
+export async function tavilyExtractWithWww(
+  urls: string[],
+): Promise<{ url: string; raw_content: string }[]> {
+  const pages = (await tavilyExtract(urls)).filter((page) => page.raw_content)
+  const fetched = new Set(pages.map((page) => page.url.replace('://www.', '://')))
+  const retry = urls
+    .filter((url) => !fetched.has(url) && !url.includes('://www.'))
+    .map((url) => url.replace('://', '://www.'))
+  if (retry.length === 0) return pages
+  return [...pages, ...(await tavilyExtract(retry)).filter((page) => page.raw_content)]
+}
+
 // Where brands usually list a contact address: /contact and /about, plus the
 // common variants (/contact-us, and Shopify's /pages/contact). Pages that
 // don't exist just come back absent; one extract call covers them all.
 const CONTACT_PATHS = ['/contact', '/contact-us', '/pages/contact', '/about']
 
 export async function tavilyExtractContactPages(domain: string): Promise<string[]> {
-  const pages = await tavilyExtract(CONTACT_PATHS.map((path) => `https://${domain}${path}`))
-  return pages.map((page) => page.raw_content).filter(Boolean)
+  const pages = await tavilyExtractWithWww(CONTACT_PATHS.map((path) => `https://${domain}${path}`))
+  return pages.map((page) => page.raw_content)
 }
