@@ -27,7 +27,7 @@ at Vercel, Supabase, Inngest, Sentry, PostHog, Anthropic, and Tavily.
 1. supabase.com → **New project**. Pick a region near your users (e.g.
    `us-west-1` / `us-east-1`) and generate a strong database password. Save the
    password in your password manager, not in the repo.
-2. Apply every migration in `supabase/migrations/` (0001 → 0008, in order) from
+2. Apply every migration in `supabase/migrations/` (0001 → 0013 as of this writing, in order) from
    your laptop:
 
    ```bash
@@ -36,13 +36,13 @@ at Vercel, Supabase, Inngest, Sentry, PostHog, Anthropic, and Tavily.
    npx supabase db push                            # prompts for the database password
    ```
 
-   `db push` must list 0001 through 0008 and finish without errors.
+   `db push` must list every file in `supabase/migrations/` (0001 through 0013) and finish without errors.
 3. Check it worked (**SQL Editor**):
 
    ```sql
    select count(*) from public.invite_codes;          -- 0, and no error
    select column_name from information_schema.columns
-    where table_name = 'deals' and column_name = 'sent_at';  -- 1 row
+    where table_name = 'discovery_runs' and column_name = 'focus';  -- 1 row (0013 applied)
    ```
 
 4. Where the keys come from (**Project Settings → API Keys**, plus **Data API**
@@ -193,6 +193,8 @@ mint one extra for yourself).
    enabled (it has a contact email).
 6. [ ] Click **Find new brands** again while it's running: "A run is already
    in progress".
+   Once it finishes, try **Search a specific direction** (e.g. "specialty
+   coffee"): matches appear labeled "From your search".
 7. [ ] Open a match with an email → **Draft outreach email**. The draft
    appears in the editor right away, with the optional "come back and paste
    their reply" note under it.
