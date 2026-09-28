@@ -15,6 +15,8 @@ const SUPABASE_SHIM = `
   create role anon nologin;
   create role authenticated nologin;
   create role service_role nologin bypassrls;
+  -- GoTrue inserts into auth.users as this (non-superuser) role.
+  create role supabase_auth_admin nologin;
 
   create schema auth;
   create table auth.users (
@@ -27,6 +29,8 @@ const SUPABASE_SHIM = `
     select nullif(current_setting('request.jwt.claims', true)::json ->> 'sub', '')::uuid
   $$;
   grant usage on schema auth to anon, authenticated, service_role;
+  grant usage on schema auth to supabase_auth_admin;
+  grant insert, select on auth.users to supabase_auth_admin;
   grant execute on function auth.uid () to anon, authenticated, service_role;
 
   alter default privileges in schema public
@@ -46,13 +50,17 @@ export async function createTestDb(): Promise<PGlite> {
   return db
 }
 
-// Creates an auth user the way GoTrue does (which fires handle_new_user).
+// Creates an auth user the way GoTrue does — as supabase_auth_admin, which
+// fires handle_new_user.
 export async function signUp(db: PGlite, id: string, inviteCode: string | null): Promise<void> {
-  await db.query('insert into auth.users (id, email, raw_user_meta_data) values ($1, $2, $3)', [
-    id,
-    `${id}@example.com`,
-    inviteCode === null ? {} : { invite_code: inviteCode },
-  ])
+  await db.transaction(async (tx) => {
+    await tx.exec('set local role supabase_auth_admin')
+    await tx.query('insert into auth.users (id, email, raw_user_meta_data) values ($1, $2, $3)', [
+      id,
+      `${id}@example.com`,
+      inviteCode === null ? {} : { invite_code: inviteCode },
+    ])
+  })
 }
 
 type Role = 'anon' | 'authenticated' | 'service_role'
