@@ -83,6 +83,7 @@ export type Deal = {
   athlete_id: string
   brand_id: string
   status: DealStatus
+  sent_at: string | null
   created_at: string
   updated_at: string
 }

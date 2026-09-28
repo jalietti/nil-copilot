@@ -18,7 +18,8 @@ export interface AnalyticsEvents {
   }
   match_dismissed: { match_id: string; brand_id: string }
   outreach_draft_generated: { deal_id: string; brand_id: string; voice_profile: boolean }
-  mailto_clicked: { deal_id: string; kind: 'outreach' | 'counter' }
+  follow_up_draft_generated: { deal_id: string; voice_profile: boolean }
+  mailto_clicked: { deal_id: string; kind: 'outreach' | 'counter' | 'follow_up' }
   reply_pasted: { deal_id: string }
   counter_draft_generated: { deal_id: string; voice_profile: boolean }
   deal_status_changed: { deal_id: string; from: DealStatus | 'none'; to: DealStatus }

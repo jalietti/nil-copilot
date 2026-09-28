@@ -151,13 +151,6 @@ export interface CounterDraftArgs {
 }
 
 export function buildCounterPrompt(args: CounterDraftArgs): string {
-  const threadText = args.thread
-    .map((message) => {
-      const who = message.direction === 'outbound_draft' ? 'ATHLETE' : 'BRAND'
-      return `--- ${who}${message.subject ? ` (subject: ${message.subject})` : ''} ---\n${message.content}`
-    })
-    .join('\n\n')
-
   return [
     "Draft the student-athlete's reply in an ongoing NIL negotiation with a brand.",
     'The athlete pasted in the brand\'s latest reply; write the response they would send',
@@ -183,8 +176,51 @@ export function buildCounterPrompt(args: CounterDraftArgs): string {
     `Name: ${args.brand.name} (${args.brand.domain})`,
     '',
     '## Thread so far (oldest first)',
-    threadText,
+    threadAsText(args.thread),
   ].join('\n')
+}
+
+function threadAsText(thread: CounterDraftArgs['thread']): string {
+  return thread
+    .map((message) => {
+      const who = message.direction === 'outbound_draft' ? 'ATHLETE' : 'BRAND'
+      return `--- ${who}${message.subject ? ` (subject: ${message.subject})` : ''} ---\n${message.content}`
+    })
+    .join('\n\n')
+}
+
+export function buildFollowUpPrompt(args: CounterDraftArgs): string {
+  return [
+    'Draft a short, friendly follow-up from a student-athlete to a brand that has not',
+    'replied to their outreach after about a week. They will send it themselves from',
+    'their own email account. First-person, ready to send.',
+    '',
+    VOICE,
+    ...athleteVoiceSection(args.interview.voice_profile),
+    '',
+    'For this follow-up specifically:',
+    '- 50-90 words. A light nudge, not a second pitch.',
+    '- No guilt-tripping, no "just circling back", no apologizing for following up.',
+    '- Refer back to the earlier email naturally and add one small new reason it fits,',
+    '  drawn only from what is already in the thread or the athlete facts below.',
+    '- Easy out: make it clear a "not right now" is totally fine.',
+    '- Subject: reuse the original subject prefixed with "Re: ".',
+    '- No placeholders, no invented facts, no emoji.',
+    '',
+    '## Athlete',
+    athleteContext(args.profile, args.interview),
+    '',
+    '## Brand',
+    `Name: ${args.brand.name} (${args.brand.domain})`,
+    '',
+    '## What the athlete already sent (oldest first)',
+    threadAsText(args.thread),
+  ].join('\n')
+}
+
+// Nudge after ~5 days with no reply logged; offered from the dashboard.
+export async function draftFollowUpEmail(args: CounterDraftArgs): Promise<EmailDraft> {
+  return draft(buildFollowUpPrompt(args))
 }
 
 // Counter/negotiation reply, grounded in the athlete's stated per-tier

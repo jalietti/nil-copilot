@@ -1,7 +1,9 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import type { Brand, Deal, DealStatus } from '@/lib/supabase/types'
+import { needsFollowUp } from '@/lib/deal-follow-up'
+import type { Brand, Deal, DealStatus, Message } from '@/lib/supabase/types'
+import { FollowUpPrompt } from './follow-up-prompt'
 
 const STATUS_LABELS: Record<DealStatus, string> = {
   draft: 'Drafting',
@@ -27,14 +29,19 @@ export default async function DashboardPage() {
     supabase.from('interviews').select('id').eq('athlete_id', user.id).maybeSingle(),
     supabase
       .from('deals')
-      .select('*, brands(*)')
+      .select('*, brands(*), messages(direction, created_at)')
       .eq('athlete_id', user.id)
       .order('updated_at', { ascending: false }),
   ])
 
   if (!profile?.onboarding_completed_at) redirect('/onboarding')
 
-  const deals = (dealRows ?? []) as unknown as (Deal & { brands: Brand })[]
+  const deals = (dealRows ?? []) as unknown as (Deal & {
+    brands: Brand
+    messages: Pick<Message, 'direction' | 'created_at'>[]
+  })[]
+  const now = new Date()
+  const followUps = deals.filter((deal) => needsFollowUp(deal, now))
   const active = deals.filter((deal) => ACTIVE_STATUSES.includes(deal.status))
   const inactive = deals.filter((deal) => !ACTIVE_STATUSES.includes(deal.status))
 
@@ -53,6 +60,19 @@ export default async function DashboardPage() {
           </Link>{' '}
           so the copilot knows which brands actually fit you.
         </p>
+      )}
+
+      {followUps.length > 0 && (
+        <section className="mb-6">
+          <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-neutral-500">
+            Did you hear back?
+          </h2>
+          <ul className="flex flex-col gap-3">
+            {followUps.map((deal) => (
+              <FollowUpPrompt key={deal.id} dealId={deal.id} brandName={deal.brands.name} />
+            ))}
+          </ul>
+        </section>
       )}
 
       {deals.length === 0 ? (

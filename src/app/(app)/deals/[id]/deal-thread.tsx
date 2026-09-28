@@ -81,7 +81,7 @@ export function DealThread({ dealId, dealStatus, brandName, contactEmail, messag
           dealId={dealId}
           draft={activeDraft}
           contactEmail={contactEmail}
-          kind={messages.some((m) => m.direction === 'inbound_pasted') ? 'counter' : 'outreach'}
+          kind={draftKind(messages)}
           pending={pending}
           run={run}
         />
@@ -98,7 +98,7 @@ export function DealThread({ dealId, dealStatus, brandName, contactEmail, messag
       )}
 
       {messages.length > 0 && (
-        <section className="rounded border border-dashed border-neutral-300 p-4">
+        <section id="reply" className="rounded border border-dashed border-neutral-300 p-4">
           <h2 className="mb-2 text-sm font-medium">Got a reply from {brandName}?</h2>
           <p className="mb-2 text-xs text-neutral-500">
             Paste it here and the copilot will draft your response around what you said matters to
@@ -150,11 +150,18 @@ export function DealThread({ dealId, dealStatus, brandName, contactEmail, messag
   )
 }
 
+type DraftKind = 'outreach' | 'counter' | 'follow_up'
+
+function draftKind(messages: Message[]): DraftKind {
+  if (messages.some((m) => m.direction === 'inbound_pasted')) return 'counter'
+  return messages.filter((m) => m.direction === 'outbound_draft').length > 1 ? 'follow_up' : 'outreach'
+}
+
 interface DraftEditorProps {
   dealId: string
   draft: Message
   contactEmail: string | null
-  kind: 'outreach' | 'counter'
+  kind: DraftKind
   pending: boolean
   run: (action: () => Promise<{ error?: string } | void>) => void
 }
@@ -218,6 +225,12 @@ function DraftEditor({ dealId, draft, contactEmail, kind, pending, run }: DraftE
           “Open in your email app” hands the draft to your own email client — you press send
           there.
         </p>
+        {kind === 'outreach' && (
+          <p className="rounded bg-neutral-50 p-3 text-xs text-neutral-600">
+            Optional: if they write back, you can come back here and paste their reply — the
+            copilot will help you negotiate. Totally fine to handle the reply yourself, too.
+          </p>
+        )}
       </div>
     </section>
   )

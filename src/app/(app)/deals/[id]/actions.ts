@@ -4,11 +4,12 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { draftOutreachEmail, draftCounterEmail } from '@/lib/draft-email'
+import { draftOutreachEmail, draftCounterEmail, draftFollowUpEmail } from '@/lib/draft-email'
 import { track } from '@/lib/analytics'
 import { draftEditUpdate } from '@/lib/draft-edits'
+import { needsFollowUp, nextDealStatus } from '@/lib/deal-follow-up'
 import { reportError } from '@/lib/observability/sentry'
-import type { Brand, DealStatus, Interview, Message, Profile } from '@/lib/supabase/types'
+import type { Brand, Deal, DealStatus, Interview, Message, Profile } from '@/lib/supabase/types'
 
 const DRAFTING_FAILED = 'The copilot couldn’t write a draft just now — try again in a minute.'
 
@@ -30,6 +31,7 @@ interface DealContext {
   dealId: string
   athleteId: string
   dealStatus: DealStatus
+  deal: Pick<Deal, 'status' | 'sent_at' | 'updated_at'>
   brand: Brand
   profile: Profile
   interview: Interview
@@ -42,7 +44,7 @@ async function loadDealContext(dealId: string): Promise<DealContext | { error: s
 
   const { data: deal } = await supabase
     .from('deals')
-    .select('id, brand_id, athlete_id, status')
+    .select('id, brand_id, athlete_id, status, sent_at, updated_at')
     .eq('id', dealId)
     .maybeSingle()
   if (!deal) return { error: 'Deal not found' }
@@ -72,6 +74,7 @@ async function loadDealContext(dealId: string): Promise<DealContext | { error: s
     dealId,
     athleteId: user.id,
     dealStatus: deal.status,
+    deal,
     brand: brand as Brand,
     profile: profile as Profile,
     interview: interview as Interview,
@@ -144,14 +147,15 @@ export async function generateCounterDraft(dealId: string): Promise<{ error?: st
     content: draft.body,
   })
   if (error) return { error: error.message }
-  await supabase.from('deals').update({ status: 'negotiating' }).eq('id', dealId)
+  const status = nextDealStatus(ctx.dealStatus, 'counter_drafted')
+  await supabase.from('deals').update({ status }).eq('id', dealId)
   after(() =>
     track('counter_draft_generated', ctx.athleteId, {
       deal_id: dealId,
       voice_profile: ctx.interview.voice_profile !== null,
     }),
   )
-  trackStatusChange(ctx.athleteId, dealId, ctx.dealStatus, 'negotiating')
+  trackStatusChange(ctx.athleteId, dealId, ctx.dealStatus, status)
   revalidatePath(`/deals/${dealId}`)
   return {}
 }
@@ -194,8 +198,13 @@ export async function markSent(dealId: string): Promise<{ error?: string }> {
     .maybeSingle()
   if (!deal) return { error: 'Deal not found' }
 
-  const newStatus = deal.status === 'draft' ? 'sent' : deal.status
-  const { error } = await supabase.from('deals').update({ status: newStatus }).eq('id', dealId)
+  const newStatus = nextDealStatus(deal.status, 'marked_sent')
+  // Starts (or, after a follow-up, restarts) the "did you hear back?" clock.
+  const sentAt = newStatus === 'sent' ? { sent_at: new Date().toISOString() } : {}
+  const { error } = await supabase
+    .from('deals')
+    .update({ status: newStatus, ...sentAt })
+    .eq('id', dealId)
   if (error) return { error: error.message }
 
   await supabase
@@ -226,9 +235,10 @@ export async function saveBrandReply(
     content: trimmed,
   })
   if (error) return { error: error.message }
-  await supabase.from('deals').update({ status: 'reply_received' }).eq('id', dealId)
+  const status = nextDealStatus(deal.status, 'reply_pasted')
+  await supabase.from('deals').update({ status }).eq('id', dealId)
   after(() => track('reply_pasted', user.id, { deal_id: dealId }))
-  trackStatusChange(user.id, dealId, deal.status, 'reply_received')
+  trackStatusChange(user.id, dealId, deal.status, status)
   revalidatePath(`/deals/${dealId}`)
   return {}
 }
@@ -241,18 +251,60 @@ export async function setDealStatus(
   const { data: deal } = await supabase.from('deals').select('status').eq('id', dealId).maybeSingle()
   if (!deal) return { error: 'Deal not found' }
 
-  const { error } = await supabase.from('deals').update({ status }).eq('id', dealId)
+  const newStatus = nextDealStatus(deal.status, status)
+  const { error } = await supabase.from('deals').update({ status: newStatus }).eq('id', dealId)
   if (error) return { error: error.message }
-  trackStatusChange(user.id, dealId, deal.status, status)
+  trackStatusChange(user.id, dealId, deal.status, newStatus)
   revalidatePath(`/deals/${dealId}`)
+  revalidatePath('/dashboard')
   return {}
+}
+
+// "Not yet" from the dashboard prompt: draft a short nudge for the athlete to
+// send themselves via mailto, same as outreach. The deal stays `sent`.
+export async function generateFollowUpDraft(dealId: string): Promise<{ error?: string }> {
+  const ctx = await loadDealContext(dealId)
+  if ('error' in ctx) return { error: ctx.error }
+  if (!needsFollowUp({ ...ctx.deal, messages: ctx.messages }, new Date())) {
+    return { error: 'No follow-up needed for this one right now' }
+  }
+
+  let draft
+  try {
+    draft = await draftFollowUpEmail({
+      profile: ctx.profile,
+      interview: ctx.interview,
+      brand: ctx.brand,
+      thread: ctx.messages,
+    })
+  } catch (e) {
+    reportError(e, { action: 'generateFollowUpDraft' })
+    return { error: DRAFTING_FAILED }
+  }
+
+  const supabase = await createClient()
+  const { error } = await supabase.from('messages').insert({
+    deal_id: dealId,
+    direction: 'outbound_draft',
+    subject: draft.subject,
+    content: draft.body,
+  })
+  if (error) return { error: error.message }
+  after(() =>
+    track('follow_up_draft_generated', ctx.athleteId, {
+      deal_id: dealId,
+      voice_profile: ctx.interview.voice_profile !== null,
+    }),
+  )
+  revalidatePath('/dashboard')
+  redirect(`/deals/${dealId}`)
 }
 
 // Analytics only: the athlete opened a draft in their own email client. The
 // app still sends nothing — the athlete presses send there.
 export async function recordMailtoClick(
   dealId: string,
-  kind: 'outreach' | 'counter',
+  kind: 'outreach' | 'counter' | 'follow_up',
 ): Promise<void> {
   const { supabase, user } = await requireUser()
   const { data: deal } = await supabase.from('deals').select('id').eq('id', dealId).maybeSingle()
