@@ -22,6 +22,13 @@ decisions — do not re-derive, relitigate, or "improve" them.
   hardcoded or hand-curated brand list. (Mocked fixtures in tests are fine.)
 - **Resend is for platform email only** (signup confirmation, match notifications,
   support) — never for brand outreach or negotiation emails.
+- **Brand outcomes may only reorder, never expand, an athlete's matches.** The
+  `brand_outcomes` table (did any athlete get a reply, did any deal reach
+  `agreed`, which contact email worked) is stored now for post-pilot ranking.
+  When ranking is built, brand responsiveness may only reorder candidates that
+  already match the athlete's stated interests — it may never inject an
+  off-interest brand. It stays brand-level facts only: never reply or draft
+  text, never which athlete, never readable by athletes.
 - **Citizenship/visa onboarding is required.** Onboarding asks citizenship/visa
   status early and shows real guidance for international athletes (with a clear
   "not legal advice — talk to your DSO/international office" disclaimer). Never

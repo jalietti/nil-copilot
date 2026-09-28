@@ -151,6 +151,11 @@ export function OnboardingForm({ userId }: { userId: string }) {
         </div>
       </fieldset>
 
+      <p className="text-xs text-neutral-500">
+        Anonymous brand-response outcomes — whether a brand replied or a deal happened, never your
+        messages or who you are — help improve matching for other athletes.
+      </p>
+
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button
         type="submit"

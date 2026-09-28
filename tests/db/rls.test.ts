@@ -181,6 +181,18 @@ describe('shared and service-only tables', () => {
     ).rejects.toThrow(/permission denied/)
   })
 
+  it("brand outcomes (fed by B's reply) are unreadable and unwritable by A", async () => {
+    expect(
+      (await db.query('select any_reply from brand_outcomes where brand_id = $1', [BRAND])).rows,
+    ).toEqual([{ any_reply: true }])
+    await expect(asA((tx) => tx.query('select * from brand_outcomes'))).rejects.toThrow(
+      /permission denied/,
+    )
+    await expect(
+      asA((tx) => tx.query(`update brand_outcomes set any_agreed = true`)),
+    ).rejects.toThrow(/permission denied/)
+  })
+
   it('an unauthenticated (anon) request sees no athlete data at all', async () => {
     for (const [table] of B_ROWS) {
       await expect(as(db, 'anon', null, (tx) => tx.query(`select * from ${table}`))).rejects.toThrow(

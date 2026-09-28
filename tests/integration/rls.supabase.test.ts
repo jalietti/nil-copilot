@@ -164,6 +164,19 @@ describe('shared and service-only tables', () => {
     expect(write.error?.message).toMatch(/permission denied/)
   })
 
+  it("brand outcomes (fed by B's pasted reply) are closed to athletes", async () => {
+    const { data: facts } = await admin
+      .from('brand_outcomes')
+      .select('any_reply')
+      .eq('brand_id', ids.brand)
+      .single()
+    expect(facts?.any_reply).toBe(true)
+    const read = await a.client.from('brand_outcomes').select('*')
+    expect(read.error?.message).toMatch(/permission denied/)
+    const write = await a.client.from('brand_outcomes').update({ any_agreed: true }).eq('brand_id', ids.brand)
+    expect(write.error?.message).toMatch(/permission denied/)
+  })
+
   it('anon (no session) gets nothing from athlete tables', async () => {
     const anon = createClient<Database>(url!, anonKey!, noSession)
     for (const [table] of tables()) {

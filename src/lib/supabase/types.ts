@@ -123,6 +123,15 @@ export type InviteCode = {
   created_at: string
 }
 
+// Brand-level outcome facts (service role only; no athlete identity or text).
+export type BrandOutcome = {
+  brand_id: string
+  any_reply: boolean
+  any_agreed: boolean
+  working_contact_email: string | null
+  updated_at: string
+}
+
 type TableSpec<Row, Required extends keyof Row = never> = {
   Row: Row
   Insert: Partial<Row> & Pick<Row, Required>
@@ -141,6 +150,7 @@ export interface Database {
       messages: TableSpec<Message, 'deal_id' | 'direction' | 'content'>
       discovery_runs: TableSpec<DiscoveryRun, 'athlete_id'>
       invite_codes: TableSpec<InviteCode, 'code'>
+      brand_outcomes: TableSpec<BrandOutcome, 'brand_id'>
     }
     Views: Record<string, never>
     Functions: Record<string, never>
