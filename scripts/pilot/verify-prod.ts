@@ -48,8 +48,20 @@ async function checkApp(appUrl: string, supabaseUrl: string) {
     `HTTP ${dashboard.status}`,
   )
 
+  // In cloud mode the SDK answers only requests signed by Inngest itself, so
+  // an unsigned check gets 401 — which is the production-safe setting. (An
+  // open 200 with details means dev mode or an older SDK.)
   const inngest = await fetch(`${appUrl}/api/inngest`)
   const info = (await inngest.json().catch(() => ({}))) as Record<string, unknown>
+  if (inngest.status === 401 && info.message === 'Unauthorized') {
+    record('PASS', 'Inngest endpoint only accepts Inngest-signed requests (cloud mode)')
+    record(
+      'WARN',
+      'Inngest sync can only be confirmed in its dashboard',
+      'app.inngest.com → Apps: nil-copilot synced, 1 function (discover-brands)',
+    )
+    return
+  }
   pass('Inngest endpoint responds', inngest.ok, `HTTP ${inngest.status}`)
   pass('Inngest has an event key', info.has_event_key === true, 'add the Inngest Vercel integration (or INNGEST_EVENT_KEY) and redeploy')
   pass('Inngest has a signing key', info.has_signing_key === true, 'add the Inngest Vercel integration (or INNGEST_SIGNING_KEY) and redeploy')
