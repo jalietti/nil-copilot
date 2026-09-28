@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { onboardingSchema } from '@/lib/validators/onboarding'
 import { getVisaGuidance } from '@/lib/visa-guidance'
-import type { CitizenshipStatus } from '@/lib/supabase/types'
+import type { CitizenshipStatus, Profile } from '@/lib/supabase/types'
 
 const CITIZENSHIP_OPTIONS: { value: CitizenshipStatus; label: string }[] = [
   { value: 'us_citizen', label: 'US citizen' },
@@ -23,18 +23,46 @@ function parseFollowers(value: string): number | null {
   return Number.isFinite(n) ? Math.floor(n) : null
 }
 
-export function OnboardingForm({ userId }: { userId: string }) {
+export type ProfileFields = Pick<
+  Profile,
+  | 'full_name'
+  | 'school'
+  | 'sport'
+  | 'division'
+  | 'instagram_followers'
+  | 'tiktok_followers'
+  | 'other_followers'
+  | 'citizenship_status'
+>
+
+const asText = (n: number | null | undefined) => (n === null || n === undefined ? '' : String(n))
+
+// Onboarding (first-time setup, then on to the interview) and the Account
+// page (edit anytime) share this form, so the visa step and its guidance are
+// identical in both places.
+export function ProfileForm({
+  userId,
+  mode,
+  initial,
+}: {
+  userId: string
+  mode: 'onboarding' | 'edit'
+  initial?: ProfileFields
+}) {
   const router = useRouter()
-  const [fullName, setFullName] = useState('')
-  const [citizenship, setCitizenship] = useState<CitizenshipStatus | ''>('')
-  const [school, setSchool] = useState('')
-  const [sport, setSport] = useState('')
-  const [division, setDivision] = useState('')
-  const [instagram, setInstagram] = useState('')
-  const [tiktok, setTiktok] = useState('')
-  const [other, setOther] = useState('')
+  const [fullName, setFullName] = useState(initial?.full_name ?? '')
+  const [citizenship, setCitizenship] = useState<CitizenshipStatus | ''>(
+    initial?.citizenship_status ?? '',
+  )
+  const [school, setSchool] = useState(initial?.school ?? '')
+  const [sport, setSport] = useState(initial?.sport ?? '')
+  const [division, setDivision] = useState(initial?.division ?? '')
+  const [instagram, setInstagram] = useState(asText(initial?.instagram_followers))
+  const [tiktok, setTiktok] = useState(asText(initial?.tiktok_followers))
+  const [other, setOther] = useState(asText(initial?.other_followers))
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
 
   const guidance = citizenship ? getVisaGuidance(citizenship) : null
 
@@ -58,23 +86,30 @@ export function OnboardingForm({ userId }: { userId: string }) {
     }
 
     setSaving(true)
+    setSaved(false)
     const supabase = createClient()
     const now = new Date().toISOString()
     const { error: updateError } = await supabase
       .from('profiles')
       .update({
         ...parsed.data,
-        visa_guidance_shown_at: guidance ? now : null,
-        onboarding_completed_at: now,
+        // Records that an athlete who needs visa guidance was shown it; an
+        // earlier record is kept if their status no longer needs it.
+        ...(guidance ? { visa_guidance_shown_at: now } : {}),
+        ...(mode === 'onboarding' ? { onboarding_completed_at: now } : {}),
       })
       .eq('id', userId)
 
+    setSaving(false)
     if (updateError) {
       setError(updateError.message)
-      setSaving(false)
       return
     }
-    router.push('/interview')
+    if (mode === 'onboarding') {
+      router.push('/interview')
+    } else {
+      setSaved(true)
+    }
     router.refresh()
   }
 
@@ -162,8 +197,9 @@ export function OnboardingForm({ userId }: { userId: string }) {
         disabled={saving}
         className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
       >
-        {saving ? 'Saving…' : 'Continue to interview'}
+        {saving ? 'Saving…' : mode === 'onboarding' ? 'Continue to interview' : 'Save profile'}
       </button>
+      {saved && <p className="text-sm text-green-700">Saved.</p>}
     </form>
   )
 }

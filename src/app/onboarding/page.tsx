@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { OnboardingForm } from './onboarding-form'
+import { ProfileForm } from '@/components/profile-form'
 
 export default async function OnboardingPage() {
   const supabase = await createClient()
@@ -23,7 +23,7 @@ export default async function OnboardingPage() {
       <p className="mb-6 text-sm text-neutral-600">
         This shapes which brands we research for you and how deals get drafted.
       </p>
-      <OnboardingForm userId={user.id} />
+      <ProfileForm userId={user.id} mode="onboarding" />
     </main>
   )
 }
