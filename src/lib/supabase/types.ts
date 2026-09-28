@@ -1,4 +1,4 @@
-// Hand-authored to match supabase/migrations/0001_initial.sql.
+// Hand-authored to match supabase/migrations/.
 // Replace with `supabase gen types typescript` output once a project is linked.
 
 export type CitizenshipStatus =
@@ -35,6 +35,7 @@ export type Profile = {
   citizenship_status: CitizenshipStatus | null
   visa_guidance_shown_at: string | null
   onboarding_completed_at: string | null
+  invite_code: string | null
   created_at: string
   updated_at: string
 }
@@ -107,6 +108,16 @@ export type DiscoveryRun = {
   created_at: string
 }
 
+// Service-role only (no anon/authenticated grants).
+export type InviteCode = {
+  code: string
+  label: string | null
+  max_uses: number | null
+  uses: number
+  revoked_at: string | null
+  created_at: string
+}
+
 type TableSpec<Row, Required extends keyof Row = never> = {
   Row: Row
   Insert: Partial<Row> & Pick<Row, Required>
@@ -124,6 +135,7 @@ export interface Database {
       deals: TableSpec<Deal, 'athlete_id' | 'brand_id'>
       messages: TableSpec<Message, 'deal_id' | 'direction' | 'content'>
       discovery_runs: TableSpec<DiscoveryRun, 'athlete_id'>
+      invite_codes: TableSpec<InviteCode, 'code'>
     }
     Views: Record<string, never>
     Functions: Record<string, never>

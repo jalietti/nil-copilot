@@ -2,11 +2,12 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
+import { signUpWithInvite } from './actions'
 
 export default function SignupPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [inviteCode, setInviteCode] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
@@ -15,14 +16,9 @@ export default function SignupPage() {
     e.preventDefault()
     setLoading(true)
     setError(null)
-    const supabase = createClient()
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { emailRedirectTo: `${location.origin}/auth/callback` },
-    })
+    const { error } = await signUpWithInvite({ email, password, inviteCode })
     if (error) {
-      setError(error.message)
+      setError(error)
       setLoading(false)
       return
     }
@@ -42,8 +38,23 @@ export default function SignupPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 p-6">
-      <h1 className="text-2xl font-semibold">Create your account</h1>
+      <div>
+        <h1 className="text-2xl font-semibold">Create your account</h1>
+        <p className="mt-1 text-sm text-neutral-600">
+          NIL Copilot is invite-only while we pilot it. You&apos;ll need the code you were sent.
+        </p>
+      </div>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <label className="flex flex-col gap-1 text-sm">
+          Invite code
+          <input
+            required
+            autoComplete="off"
+            value={inviteCode}
+            onChange={(e) => setInviteCode(e.target.value)}
+            className="rounded border border-neutral-300 px-3 py-2 uppercase"
+          />
+        </label>
         <label className="flex flex-col gap-1 text-sm">
           Email
           <input
