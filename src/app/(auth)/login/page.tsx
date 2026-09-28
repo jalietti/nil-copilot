@@ -1,12 +1,22 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
+  )
+}
+
+function LoginForm() {
   const router = useRouter()
+  // Set by /auth/callback when a confirmation or reset link didn't work.
+  const linkFailed = useSearchParams().get('error') === 'auth'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -51,7 +61,15 @@ export default function LoginPage() {
             className="rounded border border-neutral-300 px-3 py-2"
           />
         </label>
+        <Link href="/forgot-password" className="-mt-2 self-end text-xs text-neutral-600 underline">
+          Forgot password?
+        </Link>
         {error && <p className="text-sm text-red-600">{error}</p>}
+        {!error && linkFailed && (
+          <p className="text-sm text-red-600">
+            That email link is invalid or has expired. Log in, or request a new reset link.
+          </p>
+        )}
         <button
           type="submit"
           disabled={loading}

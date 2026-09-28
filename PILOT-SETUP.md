@@ -199,14 +199,17 @@ mint one extra for yourself).
 8. [ ] Click **Open in your email app**. Your mail client opens with the
    brand address, subject, and body filled in. **Don't send it.** Close the
    draft.
-9. [ ] Sentry: nothing new under Issues (or only errors you expect).
+9. [ ] Log out, click **Forgot password?**, and reset your password from the
+   email link. You land on the dashboard, and the new password works for
+   log in.
+10. [ ] Sentry: nothing new under Issues (or only errors you expect).
    PostHog → **Activity**: `interview_completed`, `discovery_run_started`,
    `discovery_run_completed`, `outreach_draft_generated`, and `mailto_clicked`
    showed up, with no email text or visa status in their properties.
-10. [ ] Clean up: in Supabase **Authentication → Users**, delete your test
+11. [ ] Clean up: in Supabase **Authentication → Users**, delete your test
     user. Its profile, interview, deals, and messages cascade away.
 
-Only after all ten pass, send the codes.
+Only after all eleven pass, send the codes.
 
 ## 10. Post-pilot survey (Google Form)
 

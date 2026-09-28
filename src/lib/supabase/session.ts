@@ -36,6 +36,7 @@ export async function updateSession(request: NextRequest) {
   const isAuthRoute =
     pathname.startsWith('/login') ||
     pathname.startsWith('/signup') ||
+    pathname.startsWith('/forgot-password') ||
     pathname.startsWith('/auth')
 
   // API routes authenticate themselves (e.g. Inngest verifies its own signing
