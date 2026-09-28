@@ -72,7 +72,11 @@ if [ -n "$value" ]; then
   ask SENTRY_PROJECT "Sentry project slug" no nil-copilot
 fi
 ask POSTHOG_KEY "PostHog project API key (phc_...)" no
-ask POSTHOG_HOST "PostHog host" no https://us.i.posthog.com
+read_value "PostHog region: us or eu" no us
+case "$value" in
+  eu|EU|https://eu.i.posthog.com) add POSTHOG_HOST https://eu.i.posthog.com no ;;
+  *) add POSTHOG_HOST https://us.i.posthog.com no ;;
+esac
 
 echo
 echo "Done. Inngest keys come from the Inngest Vercel integration. Redeploy to apply."
