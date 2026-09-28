@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  DAILY_ATTEMPT_CEILING,
   DAILY_RUN_CAP,
   STALE_RUN_MS,
   evaluateDiscoveryGuard,
@@ -36,9 +37,20 @@ describe('evaluateDiscoveryGuard', () => {
     })
   })
 
-  it(`rejects once ${DAILY_RUN_CAP} runs were started in the last 24h`, () => {
-    const runs = [run('completed', 1 * HOUR), run('completed', 5 * HOUR), run('failed', 23 * HOUR)]
+  it(`rejects once ${DAILY_RUN_CAP} runs completed in the last 24h`, () => {
+    const runs = [run('completed', 1 * HOUR), run('completed', 5 * HOUR), run('completed', 23 * HOUR)]
     expect(evaluateDiscoveryGuard(runs, now)).toEqual({ allowed: false, reason: 'daily_cap' })
+  })
+
+  it('does not count failed runs against the athlete', () => {
+    const runs = [run('completed', 1 * HOUR), run('completed', 5 * HOUR), run('failed', 6 * HOUR)]
+    expect(evaluateDiscoveryGuard(runs, now).allowed).toBe(true)
+  })
+
+  it(`stops retries after ${DAILY_ATTEMPT_CEILING} attempts in 24h even if they all failed`, () => {
+    const runs = Array.from({ length: DAILY_ATTEMPT_CEILING }, (_, i) => run('failed', (i + 1) * HOUR))
+    expect(evaluateDiscoveryGuard(runs, now)).toEqual({ allowed: false, reason: 'too_many_attempts' })
+    expect(evaluateDiscoveryGuard(runs.slice(1), now).allowed).toBe(true)
   })
 
   it('does not count runs older than 24h toward the cap', () => {
@@ -62,9 +74,9 @@ describe('evaluateDiscoveryGuard', () => {
     })
   })
 
-  it('still counts a stale run toward the daily cap', () => {
+  it('does not count a stale (dead) run toward the daily cap', () => {
     const runs = [run('completed', 2 * HOUR), run('completed', 3 * HOUR), run('running', 2 * HOUR)]
-    expect(evaluateDiscoveryGuard(runs, now)).toEqual({ allowed: false, reason: 'daily_cap' })
+    expect(evaluateDiscoveryGuard(runs, now).allowed).toBe(true)
   })
 })
 

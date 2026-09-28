@@ -63,7 +63,9 @@ export function DiscoveryControls({ latestRun, inFlight }: Props) {
         </p>
       )}
       {latestRun?.status === 'failed' && !error && (
-        <p className="text-xs text-red-600">Last run failed — try again</p>
+        <p className="text-xs text-red-600">
+          Last run hit a problem on our end — it didn&apos;t count toward your daily runs. Try again.
+        </p>
       )}
       {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
     </div>
