@@ -30,8 +30,6 @@ export function DealThread({ dealId, dealStatus, brandName, contactEmail, messag
 
   const last = messages.at(-1)
   const activeDraft = last?.direction === 'outbound_draft' ? last : null
-  const [subject, setSubject] = useState(activeDraft?.subject ?? '')
-  const [body, setBody] = useState(activeDraft?.content ?? '')
 
   function run(action: () => Promise<{ error?: string } | void>) {
     setError(null)
@@ -77,62 +75,16 @@ export function DealThread({ dealId, dealStatus, brandName, contactEmail, messag
       )}
 
       {activeDraft && (
-        <section className="rounded border border-neutral-300 p-4">
-          <h2 className="mb-3 text-sm font-medium">
-            Your draft {activeDraft.athlete_edited ? '(edited by you)' : '(copilot draft — make it yours)'}
-          </h2>
-          <div className="flex flex-col gap-3">
-            <label className="flex flex-col gap-1 text-sm">
-              Subject
-              <input value={subject} onChange={(e) => setSubject(e.target.value)} className={inputClass} />
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              Body
-              <textarea
-                rows={10}
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                className={inputClass}
-              />
-            </label>
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                onClick={() => run(() => saveDraftEdits(activeDraft.id, dealId, subject, body))}
-                disabled={pending}
-                className="rounded border border-neutral-300 px-3 py-1.5 text-sm disabled:opacity-50"
-              >
-                Save edits
-              </button>
-              {contactEmail ? (
-                <a
-                  href={buildMailtoUrl({ to: contactEmail, subject, body })}
-                  onClick={() => {
-                    const kind = messages.some((m) => m.direction === 'inbound_pasted')
-                      ? 'counter'
-                      : 'outreach'
-                    void recordMailtoClick(dealId, kind)
-                  }}
-                  className="rounded bg-black px-3 py-1.5 text-sm text-white"
-                >
-                  Open in your email app
-                </a>
-              ) : (
-                <span className="text-xs text-neutral-500">No contact email on file</span>
-              )}
-              <button
-                onClick={() => run(() => markSent(dealId))}
-                disabled={pending}
-                className="rounded border border-green-600 px-3 py-1.5 text-sm text-green-700 disabled:opacity-50"
-              >
-                I sent it ✓
-              </button>
-            </div>
-            <p className="text-xs text-neutral-500">
-              “Open in your email app” hands the draft to your own email client — you press send
-              there.
-            </p>
-          </div>
-        </section>
+        // Keyed so a newly generated draft always loads its own text.
+        <DraftEditor
+          key={activeDraft.id}
+          dealId={dealId}
+          draft={activeDraft}
+          contactEmail={contactEmail}
+          kind={messages.some((m) => m.direction === 'inbound_pasted') ? 'counter' : 'outreach'}
+          pending={pending}
+          run={run}
+        />
       )}
 
       {last?.direction === 'inbound_pasted' && (
@@ -195,5 +147,78 @@ export function DealThread({ dealId, dealStatus, brandName, contactEmail, messag
 
       {error && <p className="text-sm text-red-600">{error}</p>}
     </div>
+  )
+}
+
+interface DraftEditorProps {
+  dealId: string
+  draft: Message
+  contactEmail: string | null
+  kind: 'outreach' | 'counter'
+  pending: boolean
+  run: (action: () => Promise<{ error?: string } | void>) => void
+}
+
+function DraftEditor({ dealId, draft, contactEmail, kind, pending, run }: DraftEditorProps) {
+  const [subject, setSubject] = useState(draft.subject ?? '')
+  const [body, setBody] = useState(draft.content)
+  const dirty = subject !== (draft.subject ?? '') || body !== draft.content
+
+  return (
+    <section className="rounded border border-neutral-300 p-4">
+      <h2 className="mb-3 text-sm font-medium">
+        Your draft {draft.athlete_edited ? '(edited by you)' : '(copilot draft — make it yours)'}
+      </h2>
+      <div className="flex flex-col gap-3">
+        <label className="flex flex-col gap-1 text-sm">
+          Subject
+          <input value={subject} onChange={(e) => setSubject(e.target.value)} className={inputClass} />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          Body
+          <textarea
+            rows={10}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            className={inputClass}
+          />
+        </label>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => run(() => saveDraftEdits(draft.id, dealId, subject, body))}
+            disabled={pending || !dirty}
+            className="rounded border border-neutral-300 px-3 py-1.5 text-sm disabled:opacity-50"
+          >
+            Save edits
+          </button>
+          {contactEmail ? (
+            <a
+              href={buildMailtoUrl({ to: contactEmail, subject, body })}
+              onClick={() => {
+                // Keep what they actually sent, even if they never hit Save.
+                if (dirty) void saveDraftEdits(draft.id, dealId, subject, body)
+                void recordMailtoClick(dealId, kind)
+              }}
+              className="rounded bg-black px-3 py-1.5 text-sm text-white"
+            >
+              Open in your email app
+            </a>
+          ) : (
+            <span className="text-xs text-neutral-500">No contact email on file</span>
+          )}
+          <button
+            onClick={() => run(() => markSent(dealId))}
+            disabled={pending}
+            className="rounded border border-green-600 px-3 py-1.5 text-sm text-green-700 disabled:opacity-50"
+          >
+            I sent it ✓
+          </button>
+        </div>
+        <p className="text-xs text-neutral-500">
+          “Open in your email app” hands the draft to your own email client — you press send
+          there.
+        </p>
+      </div>
+    </section>
   )
 }

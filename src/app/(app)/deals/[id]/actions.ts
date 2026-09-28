@@ -6,8 +6,11 @@ import { after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { draftOutreachEmail, draftCounterEmail } from '@/lib/draft-email'
 import { track } from '@/lib/analytics'
+import { draftEditUpdate } from '@/lib/draft-edits'
 import { reportError } from '@/lib/observability/sentry'
 import type { Brand, DealStatus, Interview, Message, Profile } from '@/lib/supabase/types'
+
+const DRAFTING_FAILED = 'The copilot couldn’t write a draft just now — try again in a minute.'
 
 function trackStatusChange(athleteId: string, dealId: string, from: DealStatus, to: DealStatus) {
   if (from === to) return
@@ -91,7 +94,7 @@ export async function generateOutreachDraft(dealId: string): Promise<{ error?: s
     })
   } catch (e) {
     reportError(e, { action: 'generateOutreachDraft' })
-    return { error: e instanceof Error ? e.message : 'Drafting failed' }
+    return { error: DRAFTING_FAILED }
   }
 
   const supabase = await createClient()
@@ -103,7 +106,11 @@ export async function generateOutreachDraft(dealId: string): Promise<{ error?: s
   })
   if (error) return { error: error.message }
   after(() =>
-    track('outreach_draft_generated', ctx.athleteId, { deal_id: dealId, brand_id: ctx.brand.id }),
+    track('outreach_draft_generated', ctx.athleteId, {
+      deal_id: dealId,
+      brand_id: ctx.brand.id,
+      voice_profile: ctx.interview.voice_profile !== null,
+    }),
   )
   revalidatePath(`/deals/${dealId}`)
   return {}
@@ -126,7 +133,7 @@ export async function generateCounterDraft(dealId: string): Promise<{ error?: st
     })
   } catch (e) {
     reportError(e, { action: 'generateCounterDraft' })
-    return { error: e instanceof Error ? e.message : 'Drafting failed' }
+    return { error: DRAFTING_FAILED }
   }
 
   const supabase = await createClient()
@@ -138,7 +145,12 @@ export async function generateCounterDraft(dealId: string): Promise<{ error?: st
   })
   if (error) return { error: error.message }
   await supabase.from('deals').update({ status: 'negotiating' }).eq('id', dealId)
-  after(() => track('counter_draft_generated', ctx.athleteId, { deal_id: dealId }))
+  after(() =>
+    track('counter_draft_generated', ctx.athleteId, {
+      deal_id: dealId,
+      voice_profile: ctx.interview.voice_profile !== null,
+    }),
+  )
   trackStatusChange(ctx.athleteId, dealId, ctx.dealStatus, 'negotiating')
   revalidatePath(`/deals/${dealId}`)
   return {}
@@ -150,11 +162,21 @@ export async function saveDraftEdits(
   subject: string,
   content: string,
 ): Promise<{ error?: string }> {
+  if (content.trim().length === 0) return { error: 'The email body is empty' }
+  if (subject.length > 200 || content.length > 8000) return { error: 'That draft is too long' }
+
   const supabase = await createClient()
-  const { error } = await supabase
+  const { data: message } = await supabase
     .from('messages')
-    .update({ subject, content, athlete_edited: true })
+    .select('subject, content, athlete_edited, direction')
     .eq('id', messageId)
+    .eq('deal_id', dealId)
+    .maybeSingle()
+  if (!message || message.direction !== 'outbound_draft') return { error: 'Draft not found' }
+
+  const update = draftEditUpdate(message, { subject, content })
+  if (!update) return {}
+  const { error } = await supabase.from('messages').update(update).eq('id', messageId)
   if (error) return { error: error.message }
   revalidatePath(`/deals/${dealId}`)
   return {}

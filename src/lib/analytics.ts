@@ -8,7 +8,7 @@ import { reportError } from './observability/sentry'
 // distinct id is the athlete's uuid. Properties are ids, counts, enums, and
 // booleans — enforced by these types and again by scrubAnalyticsProperties.
 export interface AnalyticsEvents {
-  interview_completed: { first_time: boolean }
+  interview_completed: { first_time: boolean; voice_profile_generated: boolean }
   discovery_run_started: { run_id: string }
   discovery_run_completed: {
     run_id: string
@@ -17,10 +17,10 @@ export interface AnalyticsEvents {
     matches_with_email: number
   }
   match_dismissed: { match_id: string; brand_id: string }
-  outreach_draft_generated: { deal_id: string; brand_id: string }
+  outreach_draft_generated: { deal_id: string; brand_id: string; voice_profile: boolean }
   mailto_clicked: { deal_id: string; kind: 'outreach' | 'counter' }
   reply_pasted: { deal_id: string }
-  counter_draft_generated: { deal_id: string }
+  counter_draft_generated: { deal_id: string; voice_profile: boolean }
   deal_status_changed: { deal_id: string; from: DealStatus | 'none'; to: DealStatus }
 }
 

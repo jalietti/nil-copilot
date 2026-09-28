@@ -48,10 +48,10 @@ function athleteContext(profile: Profile, interview: Interview): string {
     `Genuine interests: ${JSON.stringify(interview.interests)}`,
     `Brands they actually use: ${JSON.stringify(interview.brands_used)}`,
     `Compensation preferences by product value tier: ` +
-      `low="${COMPENSATION_ASK_LABELS[prefs.low] ?? prefs.low}", ` +
-      `mid="${COMPENSATION_ASK_LABELS[prefs.mid] ?? prefs.mid}", ` +
-      `high="${COMPENSATION_ASK_LABELS[prefs.high] ?? prefs.high}"` +
-      (prefs.notes ? `, notes="${prefs.notes}"` : ''),
+    `low="${COMPENSATION_ASK_LABELS[prefs.low] ?? prefs.low}", ` +
+    `mid="${COMPENSATION_ASK_LABELS[prefs.mid] ?? prefs.mid}", ` +
+    `high="${COMPENSATION_ASK_LABELS[prefs.high] ?? prefs.high}"` +
+    (prefs.notes ? `, notes="${prefs.notes}"` : ''),
   ].join('\n')
 }
 
@@ -90,49 +90,67 @@ const VOICE = [
   '- Warm ≠ gushing. One genuine, grounded voice — no exclamation-point pile-ups.',
 ].join('\n')
 
-// First-touch outreach. The copilot only drafts — the athlete edits and sends
-// it themselves via mailto.
-export async function draftOutreachEmail(args: {
+// This athlete's own voice (from their interview), layered on top of the
+// shared guide. Omitted entirely when there's no profile, which is exactly
+// the pre-profile behavior.
+export function athleteVoiceSection(voiceProfile: string | null): string[] {
+  if (!voiceProfile) return []
+  return [
+    '',
+    "This athlete's own voice — write like THIS person, within the rules above",
+    '(if anything here conflicts with those rules, the rules win):',
+    voiceProfile,
+  ]
+}
+
+export interface OutreachDraftArgs {
   profile: Profile
   interview: Interview
   brand: Brand
   fitReason: string
-}): Promise<EmailDraft> {
-  return draft(
-    [
-      'Draft a first-touch NIL partnership outreach email from a student-athlete to a brand.',
-      'The athlete will review, edit, and send it themselves from their own email account —',
-      'write in their first-person voice, ready to send as-is.',
-      '',
-      VOICE,
-      '',
-      'For this first email specifically:',
-      '- Keep it short — 120-160 words. A tight, warm email beats a thorough one.',
-      '- Lead with the genuine connection to the brand (they actually use/love this stuff).',
-      '- Be honest about audience size; frame it as authentic reach, not big numbers.',
-      '- Suggest an open-ended partnership conversation; do NOT quote prices in a first email.',
-      '- No placeholders, no invented facts, no emoji.',
-      '',
-      '## Athlete',
-      athleteContext(args.profile, args.interview),
-      '',
-      '## Brand',
-      `Name: ${args.brand.name}`,
-      `Website: ${args.brand.domain}`,
-      `Description: ${args.brand.description ?? 'n/a'}`,
-      `Why this brand fits this athlete: ${args.fitReason}`,
-    ].join('\n'),
-  )
 }
 
-// Counter/negotiation reply, grounded in the athlete's stated per-tier
-// preferences. Drafted only after the athlete pastes in the brand's reply.
-export async function draftCounterEmail(args: {
+export function buildOutreachPrompt(args: OutreachDraftArgs): string {
+  return [
+    'Draft a first-touch NIL partnership outreach email from a student-athlete to a brand.',
+    'The athlete will review, edit, and send it themselves from their own email account —',
+    'write in their first-person voice, ready to send as-is.',
+    '',
+    VOICE,
+    ...athleteVoiceSection(args.interview.voice_profile),
+    '',
+    'For this first email specifically:',
+    '- Keep it short — 120-160 words. A tight, warm email beats a thorough one.',
+    '- Lead with the genuine connection to the brand (they actually use/love this stuff).',
+    '- Be honest about audience size; frame it as authentic reach, not big numbers.',
+    '- Suggest an open-ended partnership conversation; do NOT quote prices in a first email.',
+    '- No placeholders, no invented facts, no emoji.',
+    '',
+    '## Athlete',
+    athleteContext(args.profile, args.interview),
+    '',
+    '## Brand',
+    `Name: ${args.brand.name}`,
+    `Website: ${args.brand.domain}`,
+    `Description: ${args.brand.description ?? 'n/a'}`,
+    `Why this brand fits this athlete: ${args.fitReason}`,
+  ].join('\n')
+}
+
+// First-touch outreach. The copilot only drafts — the athlete edits and sends
+// it themselves via mailto.
+export async function draftOutreachEmail(args: OutreachDraftArgs): Promise<EmailDraft> {
+  return draft(buildOutreachPrompt(args))
+}
+
+export interface CounterDraftArgs {
   profile: Profile
   interview: Interview
   brand: Brand
   thread: Pick<Message, 'direction' | 'subject' | 'content'>[]
-}): Promise<EmailDraft> {
+}
+
+export function buildCounterPrompt(args: CounterDraftArgs): string {
   const threadText = args.thread
     .map((message) => {
       const who = message.direction === 'outbound_draft' ? 'ATHLETE' : 'BRAND'
@@ -140,32 +158,37 @@ export async function draftCounterEmail(args: {
     })
     .join('\n\n')
 
-  return draft(
-    [
-      "Draft the student-athlete's reply in an ongoing NIL negotiation with a brand.",
-      'The athlete pasted in the brand\'s latest reply; write the response they would send',
-      'from their own email account. First-person, ready to send.',
-      '',
-      VOICE,
-      '',
-      'For this negotiation reply specifically:',
-      '- Anchor the ask to the athlete\'s stated compensation preferences below and the',
-      '  apparent value of the product involved. Modest following = modest, honest asks.',
-      '- React like a person first — a genuine reaction to their message before the ask.',
-      '- Be collaborative, not adversarial; keep the relationship warm either way.',
-      '- Be concrete about what the athlete would deliver (posts they would make anyway).',
-      '- If the brand\'s offer already meets the athlete\'s stated preference, accept',
-      '  gracefully and enthusiastically instead of pushing for more.',
-      '- No placeholders, no invented facts, no emoji.',
-      '',
-      '## Athlete',
-      athleteContext(args.profile, args.interview),
-      '',
-      '## Brand',
-      `Name: ${args.brand.name} (${args.brand.domain})`,
-      '',
-      '## Thread so far (oldest first)',
-      threadText,
-    ].join('\n'),
-  )
+  return [
+    "Draft the student-athlete's reply in an ongoing NIL negotiation with a brand.",
+    'The athlete pasted in the brand\'s latest reply; write the response they would send',
+    'from their own email account. First-person, ready to send.',
+    '',
+    VOICE,
+    ...athleteVoiceSection(args.interview.voice_profile),
+    '',
+    'For this negotiation reply specifically:',
+    '- Anchor the ask to the athlete\'s stated compensation preferences below and the',
+    '  apparent value of the product involved. Modest following = modest, honest asks.',
+    '- React like a person first — a genuine reaction to their message before the ask.',
+    '- Be collaborative, not adversarial; keep the relationship warm either way.',
+    '- Be concrete about what the athlete would deliver (posts they would make anyway).',
+    '- If the brand\'s offer already meets the athlete\'s stated preference, accept',
+    '  gracefully and enthusiastically instead of pushing for more.',
+    '- No placeholders, no invented facts, no emoji.',
+    '',
+    '## Athlete',
+    athleteContext(args.profile, args.interview),
+    '',
+    '## Brand',
+    `Name: ${args.brand.name} (${args.brand.domain})`,
+    '',
+    '## Thread so far (oldest first)',
+    threadText,
+  ].join('\n')
+}
+
+// Counter/negotiation reply, grounded in the athlete's stated per-tier
+// preferences. Drafted only after the athlete pastes in the brand's reply.
+export async function draftCounterEmail(args: CounterDraftArgs): Promise<EmailDraft> {
+  return draft(buildCounterPrompt(args))
 }

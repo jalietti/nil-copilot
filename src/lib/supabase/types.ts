@@ -48,6 +48,7 @@ export type Interview = {
   category_tags: string[]
   deal_preferences: Record<string, unknown>
   raw_answers: Record<string, unknown> | null
+  voice_profile: string | null
   created_at: string
   updated_at: string
 }
@@ -93,6 +94,9 @@ export type Message = {
   subject: string | null
   content: string
   athlete_edited: boolean
+  // The copilot's generated text, kept once the athlete edits it.
+  original_subject: string | null
+  original_content: string | null
   created_at: string
 }
 

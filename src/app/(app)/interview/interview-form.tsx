@@ -128,6 +128,12 @@ export function InterviewForm({ initial }: Props) {
         </label>
       </fieldset>
 
+      <p className="rounded border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700">
+        <span className="font-medium">How your answers are used:</span> they decide which brands
+        the copilot researches for you, and it also uses them to learn how you talk — so the emails
+        it drafts for you sound like you, not a template. Other athletes never see them.
+      </p>
+
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button
         type="submit"

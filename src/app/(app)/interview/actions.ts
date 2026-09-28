@@ -5,6 +5,7 @@ import { after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { interviewSchema } from '@/lib/validators/interview'
 import { normalizeInterviewToTags } from '@/lib/normalize-interview'
+import { generateVoiceProfile } from '@/lib/voice-profile'
 import { track } from '@/lib/analytics'
 import { reportError } from '@/lib/observability/sentry'
 
@@ -24,13 +25,27 @@ export async function submitInterview(raw: unknown): Promise<InterviewActionResu
     return { error: parsed.error.issues[0]?.message ?? 'Please check your answers' }
   }
 
+  // Independent Claude calls; either failing must not lose the answers.
+  const [tagsResult, voiceResult] = await Promise.allSettled([
+    normalizeInterviewToTags(parsed.data),
+    generateVoiceProfile(parsed.data),
+  ])
+
   let categoryTags: string[]
-  try {
-    categoryTags = await normalizeInterviewToTags(parsed.data)
-  } catch (e) {
-    reportError(e, { action: 'normalizeInterviewToTags' })
+  if (tagsResult.status === 'fulfilled') {
+    categoryTags = tagsResult.value
+  } else {
+    reportError(tagsResult.reason, { action: 'normalizeInterviewToTags' })
     // Claude unavailable — save with raw interests as tags rather than losing answers.
     categoryTags = parsed.data.interests.map((i) => i.toLowerCase().replace(/\s+/g, '-'))
+  }
+
+  let voiceProfile: string | null = null
+  if (voiceResult.status === 'fulfilled') {
+    voiceProfile = voiceResult.value
+  } else {
+    // Drafts fall back to the shared house voice.
+    reportError(voiceResult.reason, { action: 'generateVoiceProfile' })
   }
 
   const row = {
@@ -39,6 +54,7 @@ export async function submitInterview(raw: unknown): Promise<InterviewActionResu
     category_tags: categoryTags,
     deal_preferences: parsed.data.deal_preferences,
     raw_answers: { what_matters: parsed.data.what_matters },
+    voice_profile: voiceProfile,
   }
 
   const { data: existing } = await supabase
@@ -53,6 +69,9 @@ export async function submitInterview(raw: unknown): Promise<InterviewActionResu
 
   if (error) return { error: error.message }
   const athleteId = user.id
-  after(() => track('interview_completed', athleteId, { first_time: !existing }))
+  after(() => track('interview_completed', athleteId, {
+      first_time: !existing,
+      voice_profile_generated: voiceProfile !== null,
+    }))
   redirect('/brands')
 }

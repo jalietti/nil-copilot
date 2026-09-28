@@ -44,7 +44,10 @@ describe('authenticated athlete: the app paths still work', () => {
         `insert into interviews (athlete_id, interests, category_tags) values ($1, '["trail running"]', '{trail-running}')`,
         [A],
       )
-      await tx.query(`update interviews set category_tags = '{running}' where athlete_id = $1`, [A])
+      await tx.query(
+        `update interviews set category_tags = '{running}', voice_profile = 'Chill and dry.' where athlete_id = $1`,
+        [A],
+      )
     })
   })
 
@@ -74,9 +77,11 @@ describe('authenticated athlete: the app paths still work', () => {
         `insert into messages (deal_id, direction, subject, content) values ($1, 'outbound_draft', 's', 'b') returning id`,
         [dealId],
       )
-      await tx.query(`update messages set content = 'edited', athlete_edited = true where id = $1`, [
-        msg.rows[0].id,
-      ])
+      await tx.query(
+        `update messages set content = 'edited', athlete_edited = true,
+           original_subject = 's', original_content = 'b' where id = $1`,
+        [msg.rows[0].id],
+      )
       await tx.query(
         `insert into messages (deal_id, direction, content) values ($1, 'inbound_pasted', 'reply')`,
         [dealId],
