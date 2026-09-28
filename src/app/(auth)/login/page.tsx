@@ -16,7 +16,9 @@ export default function LoginPage() {
 function LoginForm() {
   const router = useRouter()
   // Set by /auth/callback when a confirmation or reset link didn't work.
-  const linkFailed = useSearchParams().get('error') === 'auth'
+  const params = useSearchParams()
+  const linkFailed = params.get('error') === 'auth'
+  const deleted = params.get('deleted') === '1'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -39,6 +41,11 @@ function LoginForm() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 p-6">
+      {deleted && (
+        <p className="rounded border border-neutral-200 bg-neutral-50 p-3 text-sm">
+          Your account and your data have been deleted.
+        </p>
+      )}
       <h1 className="text-2xl font-semibold">Log in</h1>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <label className="flex flex-col gap-1 text-sm">
