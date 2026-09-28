@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { reportError } from './observability/sentry'
+import { recordUsage } from './usage'
 
 // One model constant for all copilot calls (drafting, fit eval, normalization).
 // claude-sonnet-5 per the approved v1 plan; override via env without a deploy.
@@ -20,6 +21,14 @@ export const COPILOT_MAX_TOKENS = 4096
 // COPILOT_MAX_TOKENS is too low for this call) rather than failing silently;
 // callers still validate the JSON and fall back as before.
 export function responseText(response: Anthropic.Message, call: string): string {
+  recordUsage({
+    provider: 'anthropic',
+    operation: 'messages',
+    call,
+    model: response.model,
+    input_tokens: response.usage?.input_tokens,
+    output_tokens: response.usage?.output_tokens,
+  })
   if (response.stop_reason === 'max_tokens') {
     reportError(new Error(`Copilot output truncated at max_tokens (${call})`), { call })
   }

@@ -1,3 +1,5 @@
+import { recordUsage, tavilyExtractCredits } from './usage'
+
 // Thin wrappers over the Tavily REST API — the only thing in this stack that
 // can search and read the live web. Server-side only.
 
@@ -34,6 +36,7 @@ export async function tavilySearch(
     max_results: maxResults,
     search_depth: 'basic',
   })
+  recordUsage({ provider: 'tavily', operation: 'search', credits: 1 })
   return data.results ?? []
 }
 
@@ -43,7 +46,15 @@ export async function tavilyExtract(
   const data = await tavilyPost<{ results?: { url: string; raw_content: string }[] }>('/extract', {
     urls,
   })
-  return data.results ?? []
+  const results = data.results ?? []
+  recordUsage({
+    provider: 'tavily',
+    operation: 'extract',
+    urls_requested: urls.length,
+    urls_succeeded: results.length,
+    credits: tavilyExtractCredits(results.length),
+  })
+  return results
 }
 
 // Some sites only answer on www. (the bare domain fails to fetch). Brand URLs

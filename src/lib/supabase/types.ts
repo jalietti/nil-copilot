@@ -137,6 +137,24 @@ export type BrandOutcome = {
   updated_at: string
 }
 
+// Owner-only (service role). One row per external API call.
+export type ApiUsage = {
+  id: number
+  created_at: string
+  provider: 'anthropic' | 'tavily'
+  operation: string
+  source: string
+  call: string | null
+  athlete_id: string | null
+  discovery_run_id: string | null
+  model: string | null
+  input_tokens: number | null
+  output_tokens: number | null
+  urls_requested: number | null
+  urls_succeeded: number | null
+  credits: number | null
+}
+
 type TableSpec<Row, Required extends keyof Row = never> = {
   Row: Row
   Insert: Partial<Row> & Pick<Row, Required>
@@ -156,6 +174,7 @@ export interface Database {
       discovery_runs: TableSpec<DiscoveryRun, 'athlete_id'>
       invite_codes: TableSpec<InviteCode, 'code'>
       brand_outcomes: TableSpec<BrandOutcome, 'brand_id'>
+      api_usage: TableSpec<ApiUsage, 'provider' | 'operation' | 'source'>
     }
     Views: Record<string, never>
     Functions: Record<string, never>

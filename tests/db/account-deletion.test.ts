@@ -71,3 +71,18 @@ describe('account deletion', () => {
     expect((await db.query('select 1 from brands where id = $1', [BRAND])).rows).toHaveLength(1)
   })
 })
+
+describe('api_usage (owner-only)', () => {
+  it('keeps a deleted athlete’s calls in the totals but drops the link', async () => {
+    const fresh = await createTestDb()
+    await fresh.exec(`insert into invite_codes (code) values ('PILOT001')`)
+    await signUp(fresh, B, 'PILOT001')
+    await fresh.query(
+      `insert into api_usage (provider, operation, source, athlete_id, input_tokens) values ('anthropic', 'messages', 'draft', $1, 100)`,
+      [B],
+    )
+    await fresh.query('delete from auth.users where id = $1', [B])
+    const { rows } = await fresh.query('select athlete_id, input_tokens from api_usage')
+    expect(rows).toEqual([{ athlete_id: null, input_tokens: 100 }])
+  })
+})

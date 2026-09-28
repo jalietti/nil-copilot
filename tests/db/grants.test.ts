@@ -111,6 +111,11 @@ describe('authenticated athlete: denied beyond what policies need', () => {
     await denied(`update brand_matches set fit_reason = 'x'`)
   })
 
+  it('cannot read or write API usage (owner-only)', async () => {
+    await denied('select * from api_usage')
+    await denied(`insert into api_usage (provider, operation, source) values ('tavily', 'search', 'draft')`)
+  })
+
   it('cannot change its own invite code or id, or insert profiles', async () => {
     await denied(`update profiles set invite_code = 'PILOT001'`)
     await denied(`update profiles set id = gen_random_uuid()`)
@@ -128,6 +133,7 @@ describe('anon', () => {
     'messages',
     'discovery_runs',
     'invite_codes',
+    'api_usage',
   ])('has no access to %s', async (table) => {
     await expect(as(db, 'anon', null, (tx) => tx.query(`select * from ${table}`))).rejects.toThrow(
       /permission denied/,

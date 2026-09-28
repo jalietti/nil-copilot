@@ -10,7 +10,13 @@ import { draftEditUpdate, regeneratedDraftUpdate } from '@/lib/draft-edits'
 import { draftKind, type DraftKind } from '@/lib/draft-kind'
 import { needsFollowUp, nextDealStatus } from '@/lib/deal-follow-up'
 import { reportError } from '@/lib/observability/sentry'
+import { withUsageContext } from '@/lib/usage'
 import type { Brand, Deal, DealStatus, Interview, Message, Profile } from '@/lib/supabase/types'
+
+// Drafting calls are recorded (owner-only api_usage) against the athlete.
+function drafting<T>(athleteId: string, fn: () => Promise<T>): Promise<T> {
+  return withUsageContext({ source: 'draft', athleteId }, fn)
+}
 
 const DRAFTING_FAILED = 'The copilot couldn’t write a draft just now — try again in a minute.'
 
@@ -90,12 +96,14 @@ export async function generateOutreachDraft(dealId: string): Promise<{ error?: s
 
   let draft
   try {
-    draft = await draftOutreachEmail({
-      profile: ctx.profile,
-      interview: ctx.interview,
-      brand: ctx.brand,
-      fitReason: ctx.fitReason,
-    })
+    draft = await drafting(ctx.athleteId, () =>
+      draftOutreachEmail({
+        profile: ctx.profile,
+        interview: ctx.interview,
+        brand: ctx.brand,
+        fitReason: ctx.fitReason,
+      }),
+    )
   } catch (e) {
     reportError(e, { action: 'generateOutreachDraft' })
     return { error: DRAFTING_FAILED }
@@ -129,12 +137,14 @@ export async function generateCounterDraft(dealId: string): Promise<{ error?: st
 
   let draft
   try {
-    draft = await draftCounterEmail({
-      profile: ctx.profile,
-      interview: ctx.interview,
-      brand: ctx.brand,
-      thread: ctx.messages,
-    })
+    draft = await drafting(ctx.athleteId, () =>
+      draftCounterEmail({
+        profile: ctx.profile,
+        interview: ctx.interview,
+        brand: ctx.brand,
+        thread: ctx.messages,
+      }),
+    )
   } catch (e) {
     reportError(e, { action: 'generateCounterDraft' })
     return { error: DRAFTING_FAILED }
@@ -272,12 +282,14 @@ export async function generateFollowUpDraft(dealId: string): Promise<{ error?: s
 
   let draft
   try {
-    draft = await draftFollowUpEmail({
-      profile: ctx.profile,
-      interview: ctx.interview,
-      brand: ctx.brand,
-      thread: ctx.messages,
-    })
+    draft = await drafting(ctx.athleteId, () =>
+      draftFollowUpEmail({
+        profile: ctx.profile,
+        interview: ctx.interview,
+        brand: ctx.brand,
+        thread: ctx.messages,
+      }),
+    )
   } catch (e) {
     reportError(e, { action: 'generateFollowUpDraft' })
     return { error: DRAFTING_FAILED }
@@ -334,12 +346,13 @@ export async function regenerateDraft(dealId: string, messageId: string): Promis
 
   let draft
   try {
-    draft =
+    draft = await drafting(ctx.athleteId, () =>
       kind === 'outreach'
-        ? await draftOutreachEmail({ ...shared, fitReason: ctx.fitReason })
+        ? draftOutreachEmail({ ...shared, fitReason: ctx.fitReason })
         : kind === 'counter'
-          ? await draftCounterEmail({ ...shared, thread: before })
-          : await draftFollowUpEmail({ ...shared, thread: before })
+          ? draftCounterEmail({ ...shared, thread: before })
+          : draftFollowUpEmail({ ...shared, thread: before }),
+    )
   } catch (e) {
     reportError(e, { action: 'regenerateDraft' })
     return { error: DRAFTING_FAILED }

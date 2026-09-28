@@ -1,5 +1,6 @@
 import { resolveMx } from 'node:dns/promises'
 import { inngest } from '../client'
+import { withUsageContext } from '@/lib/usage'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
   tavilySearch,
@@ -73,7 +74,15 @@ export const discoverBrands = inngest.createFunction(
     const { athleteId, runId } = event.data as { athleteId: string; runId: string }
     const supabase = createAdminClient()
 
-    const interview = await step.run('load-interview', async () => {
+    // Every Anthropic/Tavily call is recorded against this athlete and run
+    // (owner-only api_usage). The context is set inside each step: Inngest
+    // runs step callbacks outside the handler's async context. Memoized steps
+    // don't re-run on replay, so nothing is counted twice.
+    const usage = { source: 'discovery', athleteId, discoveryRunId: runId } as const
+    const run = <T>(id: string, fn: () => Promise<T>) =>
+      step.run(id, () => withUsageContext(usage, fn))
+
+    const interview = await run('load-interview', async () => {
       await supabase
         .from('discovery_runs')
         .update({ status: 'running', started_at: new Date().toISOString() })
@@ -93,7 +102,7 @@ export const discoverBrands = inngest.createFunction(
     })
 
     // 1. Cache first: match existing verified brands by category overlap.
-    const cached = await step.run('match-from-cache', async () => {
+    const cached = await run('match-from-cache', async () => {
       const { data: cached } = await supabase
         .from('brands')
         .select('id, domain, contact_email, contact_checked_at')
@@ -120,7 +129,7 @@ export const discoverBrands = inngest.createFunction(
       .filter((b) => needsContactLookup(b, new Date()))
       .slice(0, CACHED_CONTACT_RECHECKS_PER_RUN)
     for (const brand of due) {
-      await step.run(`recheck-contact-${brand.domain}`, async () => {
+      await run(`recheck-contact-${brand.domain}`, async () => {
         // The homepage's own emails and the contact pages it links to.
         const home = (await tavilyExtractWithWww([`https://${brand.domain}`]))[0]?.raw_content ?? ''
         const { email } = await findContactEmail(
@@ -142,13 +151,13 @@ export const discoverBrands = inngest.createFunction(
     const matchedBrandIds = [...cachedMatchIds]
 
     for (const tag of tags) {
-      const results = await step.run(`search-${tag}`, () =>
+      const results = await run(`search-${tag}`, () =>
         tavilySearch(brandSearchQuery(tag)),
       )
 
       // Read the top pages and have Claude list the brands they mention —
       // the result domains themselves are mostly media, not brands.
-      const sources = await step.run(`sources-${tag}`, async () => {
+      const sources = await run(`sources-${tag}`, async () => {
         const urls = sourcePageUrls(results, SOURCE_PAGES_PER_TAG)
         const pages = urls.length > 0 ? await tavilyExtract(urls) : []
         return pages.map((page) => ({
@@ -159,11 +168,11 @@ export const discoverBrands = inngest.createFunction(
       })
       if (sources.length === 0) continue
 
-      const mentions = await step.run(`mentions-${tag}`, () =>
+      const mentions = await run(`mentions-${tag}`, () =>
         extractBrandMentions(sources, interview.interests, tag),
       )
 
-      const plan = await step.run(`plan-${tag}`, async () => {
+      const plan = await run(`plan-${tag}`, async () => {
         const { data: known } = await supabase.from('brands').select('domain')
         return planBrandCandidates(mentions, {
           pageDomains: sources.flatMap((source) => source.linkDomains),
@@ -180,7 +189,7 @@ export const discoverBrands = inngest.createFunction(
       for (const name of plan.needsLookup) {
         if (candidates.length >= NEW_CANDIDATES_PER_TAG) break
         const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-        const domain = await step.run(`lookup-${tag}-${slug}`, async () => {
+        const domain = await run(`lookup-${tag}-${slug}`, async () => {
           const found = pickBrandDomain(
             name,
             await tavilySearch(brandLookupQuery(name), { maxResults: 5 }),
@@ -198,7 +207,7 @@ export const discoverBrands = inngest.createFunction(
       }
 
       for (const candidate of candidates) {
-        const evaluated = await step.run(`evaluate-${candidate.domain}`, () =>
+        const evaluated = await run(`evaluate-${candidate.domain}`, () =>
           evaluateCandidate(candidate.url, interview.interests, tag),
         )
         if (!evaluated || !evaluated.evaluation.is_real_brand) continue
@@ -206,7 +215,7 @@ export const discoverBrands = inngest.createFunction(
 
         // Validated (syntax + MX) or null; /contact and /about only if the
         // homepage had nothing usable.
-        const contact = await step.run(`contact-${candidate.domain}`, () =>
+        const contact = await run(`contact-${candidate.domain}`, () =>
           findContactEmail(
             candidate.domain,
             [evaluation.contact_email, ...evaluated.pageEmails],
@@ -215,7 +224,7 @@ export const discoverBrands = inngest.createFunction(
           ),
         )
 
-        const stored = await step.run(`store-${candidate.domain}`, async () => {
+        const stored = await run(`store-${candidate.domain}`, async () => {
           const { data: brand, error } = await supabase
             .from('brands')
             .upsert(
@@ -256,7 +265,7 @@ export const discoverBrands = inngest.createFunction(
     }
 
     const matchesCreated = matchedBrandIds.length
-    await step.run('finish-run', async () => {
+    await run('finish-run', async () => {
       await supabase
         .from('discovery_runs')
         .update({

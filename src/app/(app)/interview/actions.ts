@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { interviewSchema } from '@/lib/validators/interview'
 import { normalizeInterviewToTags } from '@/lib/normalize-interview'
 import { generateVoiceProfile } from '@/lib/voice-profile'
+import { withUsageContext } from '@/lib/usage'
 import { track } from '@/lib/analytics'
 import { reportError } from '@/lib/observability/sentry'
 
@@ -26,10 +27,10 @@ export async function submitInterview(raw: unknown): Promise<InterviewActionResu
   }
 
   // Independent Claude calls; either failing must not lose the answers.
-  const [tagsResult, voiceResult] = await Promise.allSettled([
-    normalizeInterviewToTags(parsed.data),
-    generateVoiceProfile(parsed.data),
-  ])
+  const [tagsResult, voiceResult] = await withUsageContext(
+    { source: 'interview', athleteId: user.id },
+    () => Promise.allSettled([normalizeInterviewToTags(parsed.data), generateVoiceProfile(parsed.data)]),
+  )
 
   let categoryTags: string[]
   if (tagsResult.status === 'fulfilled') {

@@ -250,6 +250,25 @@ or message text. Don't paste the secret key into a file in the repo;
 exporting it for the one command is enough. Mailto clicks and repeat visits
 are only in PostHog.
 
+### API usage (only you can see this)
+
+Every Anthropic and Tavily call is recorded in the `api_usage` table,
+attributed to the feature (discovery, interview, draft), the athlete, and the
+discovery run. Athletes can't see it anywhere. With the same exported
+production values as above:
+
+```bash
+npm run usage:report                 # last 7 days
+npm run usage:report -- --days 30
+```
+
+It shows tokens and Tavily credits overall, by feature, per discovery run,
+and for the heaviest athletes (shortened ids). As measured locally, one
+discovery run is roughly 24 Tavily credits and ~90k input / ~5k output Claude
+tokens. Check your Tavily plan's monthly credits against that before the
+pilot. Dollar costs aren't computed (prices change; spend metering is on the
+deferred list).
+
 ## What we're measuring
 
 The pilot succeeds if athletes get actionable matches, actually reach out,
