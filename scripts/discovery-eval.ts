@@ -30,6 +30,7 @@ import {
   planBrandCandidates,
   readablePageText,
   sourcePageUrls,
+  discoveryTags,
   tagsForRun,
   type BrandCandidate,
 } from '@/lib/discovery'
@@ -46,6 +47,8 @@ interface Profile {
   id: string
   interests: string[]
   category_tags: string[]
+  values?: string[]
+  target_industries?: string[]
 }
 
 interface BrandResult {
@@ -65,6 +68,8 @@ interface TagResult {
 }
 
 const calls = { tavilySearch: 0, tavilyExtract: 0, claude: 0 }
+
+const athleteOf = (profile: Profile) => ({ interests: profile.interests, values: profile.values ?? [] })
 
 async function researchTag(profile: Profile, tag: string, seen: Set<string>): Promise<TagResult> {
   const L = DISCOVERY_LIMITS
@@ -90,7 +95,7 @@ async function researchTag(profile: Profile, tag: string, seen: Set<string>): Pr
   if (sources.length === 0) return result
 
   calls.claude++
-  const mentions = await extractBrandMentions(sources, profile.interests, tag)
+  const mentions = await extractBrandMentions(sources, athleteOf(profile), tag)
   result.mentions = mentions.length
 
   const plan = planBrandCandidates(mentions, {
@@ -113,7 +118,7 @@ async function researchTag(profile: Profile, tag: string, seen: Set<string>): Pr
     seen.add(candidate.domain)
     calls.tavilyExtract++
     calls.claude++
-    const evaluated = await evaluateCandidate(candidate.url, profile.interests, tag)
+    const evaluated = await evaluateCandidate(candidate.url, athleteOf(profile), tag)
     if (!evaluated?.evaluation.is_real_brand) {
       result.brands.push({ domain: candidate.domain, real: false, goodFit: false, email: null })
       continue
@@ -195,7 +200,11 @@ async function main() {
 
   for (const profile of selected) {
     const seen = new Set<string>()
-    for (const tag of tagsForRun(profile.category_tags, 0, tagsPerProfile)) {
+    for (const tag of tagsForRun(
+      discoveryTags(profile.target_industries ?? [], profile.category_tags),
+      0,
+      tagsPerProfile,
+    )) {
       process.stdout.write(`${profile.id} / ${tag} … `)
       try {
         const row = await researchTag(profile, tag, seen)

@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { interviewSchema } from '@/lib/validators/interview'
-import { normalizeInterviewToTags } from '@/lib/normalize-interview'
+import { fallbackTags, normalizeInterview } from '@/lib/normalize-interview'
 import { generateVoiceProfile } from '@/lib/voice-profile'
 import { withUsageContext } from '@/lib/usage'
 import { track } from '@/lib/analytics'
@@ -29,16 +29,18 @@ export async function submitInterview(raw: unknown): Promise<InterviewActionResu
   // Independent Claude calls; either failing must not lose the answers.
   const [tagsResult, voiceResult] = await withUsageContext(
     { source: 'interview', athleteId: user.id },
-    () => Promise.allSettled([normalizeInterviewToTags(parsed.data), generateVoiceProfile(parsed.data)]),
+    () => Promise.allSettled([normalizeInterview(parsed.data), generateVoiceProfile(parsed.data)]),
   )
 
   let categoryTags: string[]
+  let suggestedValues: string[] = []
   if (tagsResult.status === 'fulfilled') {
-    categoryTags = tagsResult.value
+    categoryTags = tagsResult.value.categoryTags
+    suggestedValues = tagsResult.value.values
   } else {
-    reportError(tagsResult.reason, { action: 'normalizeInterviewToTags' })
+    reportError(tagsResult.reason, { action: 'normalizeInterview' })
     // Claude unavailable — save with raw interests as tags rather than losing answers.
-    categoryTags = parsed.data.interests.map((i) => i.toLowerCase().replace(/\s+/g, '-'))
+    categoryTags = fallbackTags(parsed.data)
   }
 
   let voiceProfile: string | null = null
@@ -60,13 +62,15 @@ export async function submitInterview(raw: unknown): Promise<InterviewActionResu
 
   const { data: existing } = await supabase
     .from('interviews')
-    .select('id')
+    .select('id, values_customized')
     .eq('athlete_id', user.id)
     .maybeSingle()
 
+  // Values follow the interview until the athlete edits them on the Brands page.
+  const values = existing?.values_customized ? {} : { values: suggestedValues }
   const { error } = existing
-    ? await supabase.from('interviews').update(row).eq('id', existing.id)
-    : await supabase.from('interviews').insert({ athlete_id: user.id, ...row })
+    ? await supabase.from('interviews').update({ ...row, ...values }).eq('id', existing.id)
+    : await supabase.from('interviews').insert({ athlete_id: user.id, ...row, ...values })
 
   if (error) return { error: error.message }
   const athleteId = user.id

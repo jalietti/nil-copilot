@@ -49,6 +49,10 @@ export type Interview = {
   deal_preferences: Record<string, unknown>
   raw_answers: Record<string, unknown> | null
   voice_profile: string | null
+  // "What you're looking for" (0012), edited on the Brands page.
+  values: string[]
+  target_industries: string[]
+  values_customized: boolean
   created_at: string
   updated_at: string
 }

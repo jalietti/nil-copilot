@@ -74,6 +74,18 @@ test('new athlete: invite-gated signup, confirmation, visa step, interview with 
   await page.waitForURL('**/brands')
   await expect(page.getByRole('button', { name: 'Find new brands' })).toBeVisible()
 
+  // Values pre-filled from the interview; editable separately, with industries.
+  const lookingFor = page.locator('section').filter({ hasText: "What you're looking for" })
+  await expect(lookingFor.getByText('(from your interview)')).toBeVisible()
+  await expect(lookingFor.getByText('ocean conservation')).toBeVisible()
+  await lookingFor.getByRole('button', { name: 'Edit' }).click()
+  await lookingFor.getByLabel(/Values brands should share/).fill('ocean conservation\nwomen-owned')
+  await lookingFor.getByLabel(/Industries you'd like to work in/).fill('specialty coffee')
+  await lookingFor.getByRole('button', { name: 'Save' }).click()
+  await expect(lookingFor.getByText('women-owned')).toBeVisible()
+  await expect(lookingFor.getByText('specialty coffee')).toBeVisible()
+  await expect(lookingFor.getByText('(from your interview)')).toBeHidden()
+
   expect(csp).toEqual([])
 })
 

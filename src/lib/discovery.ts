@@ -224,6 +224,15 @@ export function pickBrandDomain(name: string, results: TavilySearchResult[]): st
   return null
 }
 
+// Everything a run can research: the athlete's chosen industries first (as
+// kebab-case tags, like interview tags), then their interest tags.
+export function discoveryTags(industries: string[], categoryTags: string[]): string[] {
+  const industryTags = industries.map((i) =>
+    i.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+  )
+  return [...new Set([...industryTags, ...categoryTags].filter(Boolean))]
+}
+
 // Which interest tags a run researches: successive runs rotate through all of
 // the athlete's tags instead of repeating the first few (whose brands are
 // already in the cache after one run).

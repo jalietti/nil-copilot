@@ -18,6 +18,19 @@ export const DISCOVERY_LIMITS = {
   LOOKUPS_PER_TAG: 6,
 } as const
 
+// What discovery knows about the athlete when judging brands. Values are a
+// soft preference: they steer which brands are picked and how fit is judged,
+// but never rule out a strong match on the athlete's actual interests.
+export interface AthleteSearchProfile {
+  interests: string[]
+  values: string[]
+}
+
+function valuesLines(values: string[], use: string): string[] {
+  if (values.length === 0) return []
+  return [`Values the athlete wants brands to share: ${JSON.stringify(values)} — ${use}`]
+}
+
 export function brandSearchQuery(tag: string): string {
   return `best small independent ${tag.replace(/-/g, ' ')} brands`
 }
@@ -26,9 +39,38 @@ export function brandLookupQuery(brandName: string): string {
   return `${brandName} official website`
 }
 
+export function buildMentionsPrompt(
+  sources: { url: string; text: string }[],
+  athlete: AthleteSearchProfile,
+  tag: string,
+): string {
+  return [
+    'These web pages came up when researching brands for a student-athlete. Most are',
+    'articles or reviews; some may be a brand\'s own site. List the brands they mention',
+    'that make and sell their own products in this category.',
+    '',
+    `Category: ${tag}`,
+    `Athlete's stated interests: ${JSON.stringify(athlete.interests)}`,
+    ...valuesLines(
+      athlete.values,
+      'when ordering, favor brands the pages show sharing them, but still include strong fits whose values aren\'t mentioned.',
+    ),
+    '',
+    'Rules:',
+    '- Only brands named in the pages below. Never add brands from memory.',
+    '- Exclude retailers and marketplaces (REI, Backcountry, Amazon, etc.), publishers,',
+    '  and review sites.',
+    '- Order by fit with the athlete\'s interests; prefer smaller and independent brands',
+    '  over giant household names when both fit.',
+    '- At most 10 brands.',
+    '',
+    ...sources.flatMap((source) => [`--- page: ${source.url} ---`, source.text, '']),
+  ].join('\n')
+}
+
 export async function extractBrandMentions(
   sources: { url: string; text: string }[],
-  interests: string[],
+  athlete: AthleteSearchProfile,
   tag: string,
 ): Promise<BrandMention[]> {
   const client = createAnthropicClient()
@@ -65,24 +107,7 @@ export async function extractBrandMentions(
     messages: [
       {
         role: 'user',
-        content: [
-          'These web pages came up when researching brands for a student-athlete. Most are',
-          'articles or reviews; some may be a brand\'s own site. List the brands they mention',
-          'that make and sell their own products in this category.',
-          '',
-          `Category: ${tag}`,
-          `Athlete's stated interests: ${JSON.stringify(interests)}`,
-          '',
-          'Rules:',
-          '- Only brands named in the pages below. Never add brands from memory.',
-          '- Exclude retailers and marketplaces (REI, Backcountry, Amazon, etc.), publishers,',
-          '  and review sites.',
-          '- Order by fit with the athlete\'s interests; prefer smaller and independent brands',
-          '  over giant household names when both fit.',
-          '- At most 10 brands.',
-          '',
-          ...sources.flatMap((source) => [`--- page: ${source.url} ---`, source.text, '']),
-        ].join('\n'),
+        content: buildMentionsPrompt(sources, athlete, tag),
       },
     ],
   })
@@ -91,9 +116,33 @@ export async function extractBrandMentions(
   return parseBrandMentions(text)
 }
 
+export function buildEvaluationPrompt(
+  url: string,
+  content: string,
+  athlete: AthleteSearchProfile,
+  tag: string,
+): string {
+  return [
+    'Evaluate whether this website belongs to a real brand that could be a',
+    'genuine NIL partnership fit for a student-athlete.',
+    '',
+    `Athlete's stated interests: ${JSON.stringify(athlete.interests)}`,
+    ...valuesLines(
+      athlete.values,
+      'weigh them in the fit: a brand that clearly conflicts with them is not a good fit, and if the page shows it shares them, say so in fit_reason. Missing evidence is not a conflict.',
+    ),
+    `Category being researched: ${tag}`,
+    '',
+    'Only report a contact email that literally appears in the content below.',
+    `Website: ${url}`,
+    '--- page content ---',
+    content,
+  ].join('\n')
+}
+
 export async function evaluateCandidate(
   url: string,
-  interests: string[],
+  athlete: AthleteSearchProfile,
   tag: string,
 ): Promise<{ evaluation: BrandEval; pageEmails: string[]; contactLinks: string[] } | null> {
   const pages = await tavilyExtractWithWww([url])
@@ -148,18 +197,7 @@ export async function evaluateCandidate(
     messages: [
       {
         role: 'user',
-        content: [
-          'Evaluate whether this website belongs to a real brand that could be a',
-          'genuine NIL partnership fit for a student-athlete.',
-          '',
-          `Athlete's stated interests: ${JSON.stringify(interests)}`,
-          `Category being researched: ${tag}`,
-          '',
-          'Only report a contact email that literally appears in the content below.',
-          `Website: ${url}`,
-          '--- page content ---',
-          content,
-        ].join('\n'),
+        content: buildEvaluationPrompt(url, content, athlete, tag),
       },
     ],
   })

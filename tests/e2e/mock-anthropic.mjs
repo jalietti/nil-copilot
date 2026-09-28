@@ -9,7 +9,7 @@ const PORT = Number(process.env.MOCK_ANTHROPIC_PORT ?? 4010)
 
 function answer(prompt) {
   if (prompt.includes('brand-category tags')) {
-    return { category_tags: ['open-water-swimming', 'reef-safe-sunscreen'] }
+    return { category_tags: ['open-water-swimming', 'reef-safe-sunscreen'], values: ['ocean conservation'] }
   }
   if (prompt.includes('voice profile')) {
     return {

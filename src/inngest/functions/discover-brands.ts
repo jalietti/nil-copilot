@@ -14,6 +14,7 @@ import {
   planBrandCandidates,
   readablePageText,
   sourcePageUrls,
+  discoveryTags,
   tagsForRun,
   type BrandCandidate,
 } from '@/lib/discovery'
@@ -89,7 +90,7 @@ export const discoverBrands = inngest.createFunction(
         .eq('id', runId)
       const { data } = await supabase
         .from('interviews')
-        .select('interests, brands_used, category_tags, deal_preferences')
+        .select('interests, brands_used, category_tags, deal_preferences, values, target_industries')
         .eq('athlete_id', athleteId)
         .maybeSingle()
       if (!data) throw new Error(`No interview found for athlete ${athleteId}`)
@@ -146,7 +147,12 @@ export const discoverBrands = inngest.createFunction(
     }
 
     // 2. Live research per category tag.
-    const tags = tagsForRun(interview.category_tags, interview.priorRuns, SEARCH_TAGS_PER_RUN)
+    const tags = tagsForRun(
+      discoveryTags(interview.target_industries, interview.category_tags),
+      interview.priorRuns,
+      SEARCH_TAGS_PER_RUN,
+    )
+    const athlete = { interests: interview.interests, values: interview.values }
     let brandsFound = 0
     const matchedBrandIds = [...cachedMatchIds]
 
@@ -169,7 +175,7 @@ export const discoverBrands = inngest.createFunction(
       if (sources.length === 0) continue
 
       const mentions = await run(`mentions-${tag}`, () =>
-        extractBrandMentions(sources, interview.interests, tag),
+        extractBrandMentions(sources, athlete, tag),
       )
 
       const plan = await run(`plan-${tag}`, async () => {
@@ -208,7 +214,7 @@ export const discoverBrands = inngest.createFunction(
 
       for (const candidate of candidates) {
         const evaluated = await run(`evaluate-${candidate.domain}`, () =>
-          evaluateCandidate(candidate.url, interview.interests, tag),
+          evaluateCandidate(candidate.url, athlete, tag),
         )
         if (!evaluated || !evaluated.evaluation.is_real_brand) continue
         const { evaluation } = evaluated

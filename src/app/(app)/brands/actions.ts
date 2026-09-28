@@ -10,6 +10,7 @@ import { inngest } from '@/inngest/client'
 import { track } from '@/lib/analytics'
 import { reportError } from '@/lib/observability/sentry'
 import { hasValidMx, isUsableAthleteEmail } from '@/lib/contact-email'
+import { searchPreferencesSchema } from '@/lib/validators/interview'
 import {
   DISCOVERY_BLOCK_MESSAGES,
   dailyWindowStart,
@@ -179,6 +180,42 @@ export async function addContactEmail(
   if (!match) return { error: 'Match not found' }
 
   after(() => track('contact_email_added', user.id, { match_id: matchId, brand_id: match.brand_id }))
+  revalidatePath('/brands')
+  return {}
+}
+
+// "What you're looking for": values and industries, edited separately from
+// the interview. Once edited, re-doing the interview won't overwrite values.
+export async function saveSearchPreferences(raw: unknown): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const parsed = searchPreferencesSchema.safeParse(raw)
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Check your entries' }
+  const dedupe = (items: string[]) => [...new Map(items.map((i) => [i.toLowerCase(), i])).values()]
+
+  const { data, error } = await supabase
+    .from('interviews')
+    .update({
+      values: dedupe(parsed.data.values),
+      target_industries: dedupe(parsed.data.target_industries),
+      values_customized: true,
+    })
+    .eq('athlete_id', user.id)
+    .select('id')
+    .maybeSingle()
+  if (error) return { error: error.message }
+  if (!data) return { error: 'Do the interview first' }
+
+  after(() =>
+    track('search_preferences_updated', user.id, {
+      values_count: parsed.data.values.length,
+      industries_count: parsed.data.target_industries.length,
+    }),
+  )
   revalidatePath('/brands')
   return {}
 }

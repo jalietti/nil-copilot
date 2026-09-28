@@ -42,7 +42,7 @@ update public.profiles set
   onboarding_completed_at = now() - interval '14 days'
 where id = '11111111-1111-4111-8111-111111111111';
 
-insert into public.interviews (athlete_id, interests, brands_used, category_tags, deal_preferences, raw_answers, voice_profile)
+insert into public.interviews (athlete_id, interests, brands_used, category_tags, deal_preferences, raw_answers, voice_profile, "values", target_industries)
 values (
   '11111111-1111-4111-8111-111111111111',
   '["open water swimming", "reef-safe sunscreen", "specialty coffee"]',
@@ -50,7 +50,9 @@ values (
   '{open-water-swimming,reef-safe-sunscreen,sustainable-swimwear,specialty-coffee,ocean-conservation}',
   '{"low": "product_only", "mid": "product_plus_payment", "high": "payment_required"}',
   '{"what_matters": "Small brands that actually care about the ocean over a big check."}',
-  'Casual and warm, a little dry. Talks about the water more than the sport. Short sentences, no hype — sounds like a teammate recommending something, not a pitch. Cares about ocean health and small brands that answer their own emails.'
+  'Casual and warm, a little dry. Talks about the water more than the sport. Short sentences, no hype — sounds like a teammate recommending something, not a pitch. Cares about ocean health and small brands that answer their own emails.',
+  '{"ocean conservation","small independent brands"}',
+  '{"specialty coffee"}'
 );
 
 insert into public.brands (id, domain, name, description, categories, contact_email, contact_checked_at, source_urls, discovered_via, verified_at) values

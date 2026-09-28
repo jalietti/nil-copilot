@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { DiscoveryControls } from './discovery-controls'
 import { MatchCard } from './match-card'
+import { SearchPreferences } from './search-preferences'
 import { isRunInFlight } from '@/lib/discovery-guard'
 import type { Brand, BrandMatch } from '@/lib/supabase/types'
 
@@ -14,7 +15,11 @@ export default async function BrandsPage() {
   if (!user) redirect('/login')
 
   const [{ data: interview }, { data: matches }, { data: latestRun }] = await Promise.all([
-    supabase.from('interviews').select('id').eq('athlete_id', user.id).maybeSingle(),
+    supabase
+      .from('interviews')
+      .select('id, values, target_industries, values_customized, raw_answers')
+      .eq('athlete_id', user.id)
+      .maybeSingle(),
     supabase
       .from('brand_matches')
       .select('*, brands(*)')
@@ -56,6 +61,14 @@ export default async function BrandsPage() {
           inFlight={latestRun ? isRunInFlight(latestRun, new Date()) : false}
         />
       </div>
+      <SearchPreferences
+        values={interview.values}
+        industries={interview.target_industries}
+        fromInterview={!interview.values_customized}
+        whatMatters={
+          ((interview.raw_answers as { what_matters?: string } | null)?.what_matters ?? '').trim()
+        }
+      />
       {matchList.length === 0 ? (
         <p className="text-sm text-neutral-600">
           No matches yet. Kick off discovery and the copilot will research brands that actually fit

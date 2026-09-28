@@ -33,6 +33,16 @@ const EMAIL_OUTPUT_CONFIG = {
   },
 }
 
+// What the athlete said matters and the values they want brands to share —
+// real reasons a pitch can mention, never to be overstated.
+function whatMattersLines(interview: Interview): string[] {
+  const whatMatters = (interview.raw_answers as { what_matters?: string } | null)?.what_matters?.trim()
+  return [
+    ...(whatMatters ? [`What matters to them in a partnership (their words): ${JSON.stringify(whatMatters)}`] : []),
+    ...(interview.values?.length ? [`Values they want brands to share: ${JSON.stringify(interview.values)}`] : []),
+  ]
+}
+
 function athleteContext(profile: Profile, interview: Interview): string {
   const followers = totalFollowers({
     instagram: profile.instagram_followers,
@@ -47,6 +57,7 @@ function athleteContext(profile: Profile, interview: Interview): string {
     `Total followers across platforms: ${followers} (${followerTier(followers)} tier)`,
     `Genuine interests: ${JSON.stringify(interview.interests)}`,
     `Brands they actually use: ${JSON.stringify(interview.brands_used)}`,
+    ...whatMattersLines(interview),
     `Compensation preferences by product value tier: ` +
     `low="${COMPENSATION_ASK_LABELS[prefs.low] ?? prefs.low}", ` +
     `mid="${COMPENSATION_ASK_LABELS[prefs.mid] ?? prefs.mid}", ` +

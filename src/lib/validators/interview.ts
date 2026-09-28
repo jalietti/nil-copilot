@@ -27,4 +27,15 @@ export type InterviewInput = z.infer<typeof interviewSchema>
 // Shape Claude must return when normalizing free text into category tags.
 export const normalizedTagsSchema = z.object({
   category_tags: z.array(z.string().trim().min(1).max(50)).min(1).max(15),
+  values: z.array(z.string().trim().min(1).max(60)).max(8).default([]),
 })
+
+const preferenceItem = z.string().trim().min(2, 'Too short').max(60, 'Keep each one under 60 characters')
+
+// Edited on the Brands page ("What you're looking for").
+export const searchPreferencesSchema = z.object({
+  values: z.array(preferenceItem).max(8, 'Up to 8 values'),
+  target_industries: z.array(preferenceItem).max(8, 'Up to 8 industries'),
+})
+
+export type SearchPreferences = z.infer<typeof searchPreferencesSchema>
