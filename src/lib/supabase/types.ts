@@ -100,6 +100,8 @@ export type Message = {
   // The copilot's generated text, kept once the athlete edits it.
   original_subject: string | null
   original_content: string | null
+  // Versions replaced by "Try another version" (see draft-edits.ts).
+  previous_versions: unknown[]
   created_at: string
 }
 

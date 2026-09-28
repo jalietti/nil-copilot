@@ -6,7 +6,8 @@ import { after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { draftOutreachEmail, draftCounterEmail, draftFollowUpEmail } from '@/lib/draft-email'
 import { track } from '@/lib/analytics'
-import { draftEditUpdate } from '@/lib/draft-edits'
+import { draftEditUpdate, regeneratedDraftUpdate } from '@/lib/draft-edits'
+import { draftKind, type DraftKind } from '@/lib/draft-kind'
 import { needsFollowUp, nextDealStatus } from '@/lib/deal-follow-up'
 import { reportError } from '@/lib/observability/sentry'
 import type { Brand, Deal, DealStatus, Interview, Message, Profile } from '@/lib/supabase/types'
@@ -304,10 +305,53 @@ export async function generateFollowUpDraft(dealId: string): Promise<{ error?: s
 // app still sends nothing — the athlete presses send there.
 export async function recordMailtoClick(
   dealId: string,
-  kind: 'outreach' | 'counter' | 'follow_up',
+  kind: DraftKind,
 ): Promise<void> {
   const { supabase, user } = await requireUser()
   const { data: deal } = await supabase.from('deals').select('id').eq('id', dealId).maybeSingle()
   if (!deal) return
   after(() => track('mailto_clicked', user.id, { deal_id: dealId, kind }))
+}
+
+// "Try another version": redraft the active draft with a different angle. The
+// replaced version (and any edits to it) is kept in previous_versions.
+export async function regenerateDraft(dealId: string, messageId: string): Promise<{ error?: string }> {
+  const ctx = await loadDealContext(dealId)
+  if ('error' in ctx) return { error: ctx.error }
+
+  const current = ctx.messages.at(-1)
+  if (!current || current.id !== messageId || current.direction !== 'outbound_draft') {
+    return { error: 'Only the latest draft can be redrafted' }
+  }
+  const before = ctx.messages.slice(0, -1)
+  const kind = draftKind(before)
+  const shared = {
+    profile: ctx.profile,
+    interview: ctx.interview,
+    brand: ctx.brand,
+    previousDraft: { subject: current.subject ?? '', body: current.content },
+  }
+
+  let draft
+  try {
+    draft =
+      kind === 'outreach'
+        ? await draftOutreachEmail({ ...shared, fitReason: ctx.fitReason })
+        : kind === 'counter'
+          ? await draftCounterEmail({ ...shared, thread: before })
+          : await draftFollowUpEmail({ ...shared, thread: before })
+  } catch (e) {
+    reportError(e, { action: 'regenerateDraft' })
+    return { error: DRAFTING_FAILED }
+  }
+
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('messages')
+    .update(regeneratedDraftUpdate(current, { subject: draft.subject, content: draft.body }, new Date()))
+    .eq('id', messageId)
+  if (error) return { error: error.message }
+  after(() => track('draft_regenerated', ctx.athleteId, { deal_id: dealId, kind }))
+  revalidatePath(`/deals/${dealId}`)
+  return {}
 }

@@ -2,12 +2,14 @@
 
 import { useState, useTransition } from 'react'
 import { buildMailtoUrl } from '@/lib/mailto'
+import { draftKind, type DraftKind } from '@/lib/draft-kind'
 import type { DealStatus, Message } from '@/lib/supabase/types'
 import {
   generateCounterDraft,
   generateOutreachDraft,
   markSent,
   recordMailtoClick,
+  regenerateDraft,
   saveBrandReply,
   saveDraftEdits,
   setDealStatus,
@@ -75,13 +77,13 @@ export function DealThread({ dealId, dealStatus, brandName, contactEmail, messag
       )}
 
       {activeDraft && (
-        // Keyed so a newly generated draft always loads its own text.
+        // Keyed so a newly generated (or regenerated) draft loads its own text.
         <DraftEditor
-          key={activeDraft.id}
+          key={`${activeDraft.id}:${activeDraft.previous_versions.length}`}
           dealId={dealId}
           draft={activeDraft}
           contactEmail={contactEmail}
-          kind={draftKind(messages)}
+          kind={draftKind(messages.slice(0, -1))}
           pending={pending}
           run={run}
         />
@@ -150,13 +152,6 @@ export function DealThread({ dealId, dealStatus, brandName, contactEmail, messag
   )
 }
 
-type DraftKind = 'outreach' | 'counter' | 'follow_up'
-
-function draftKind(messages: Message[]): DraftKind {
-  if (messages.some((m) => m.direction === 'inbound_pasted')) return 'counter'
-  return messages.filter((m) => m.direction === 'outbound_draft').length > 1 ? 'follow_up' : 'outreach'
-}
-
 interface DraftEditorProps {
   dealId: string
   draft: Message
@@ -197,6 +192,17 @@ function DraftEditor({ dealId, draft, contactEmail, kind, pending, run }: DraftE
             className="rounded border border-neutral-300 px-3 py-1.5 text-sm disabled:opacity-50"
           >
             Save edits
+          </button>
+          <button
+            onClick={() => {
+              const edited = dirty || draft.athlete_edited
+              if (edited && !window.confirm('Replace your edited draft with a new version?')) return
+              run(() => regenerateDraft(dealId, draft.id))
+            }}
+            disabled={pending}
+            className="rounded border border-neutral-300 px-3 py-1.5 text-sm disabled:opacity-50"
+          >
+            {pending ? 'Working…' : 'Try another version'}
           </button>
           {contactEmail ? (
             <a

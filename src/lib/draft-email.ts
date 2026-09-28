@@ -103,11 +103,26 @@ export function athleteVoiceSection(voiceProfile: string | null): string[] {
   ]
 }
 
+// "Try another version": show the drafter what the athlete didn't want, so
+// the new draft takes a genuinely different angle within the same rules.
+export function alternativeSection(previous: EmailDraft | undefined): string[] {
+  if (!previous) return []
+  return [
+    '',
+    'The athlete asked for a different version. Their current draft is below — write a',
+    'genuinely different take (different opening, angle, and structure), with the same',
+    'facts, rules, and voice. Do not reuse its sentences.',
+    `--- current draft (subject: ${previous.subject}) ---`,
+    previous.body,
+  ]
+}
+
 export interface OutreachDraftArgs {
   profile: Profile
   interview: Interview
   brand: Brand
   fitReason: string
+  previousDraft?: EmailDraft
 }
 
 export function buildOutreachPrompt(args: OutreachDraftArgs): string {
@@ -134,6 +149,7 @@ export function buildOutreachPrompt(args: OutreachDraftArgs): string {
     `Website: ${args.brand.domain}`,
     `Description: ${args.brand.description ?? 'n/a'}`,
     `Why this brand fits this athlete: ${args.fitReason}`,
+    ...alternativeSection(args.previousDraft),
   ].join('\n')
 }
 
@@ -148,6 +164,7 @@ export interface CounterDraftArgs {
   interview: Interview
   brand: Brand
   thread: Pick<Message, 'direction' | 'subject' | 'content'>[]
+  previousDraft?: EmailDraft
 }
 
 export function buildCounterPrompt(args: CounterDraftArgs): string {
@@ -177,6 +194,7 @@ export function buildCounterPrompt(args: CounterDraftArgs): string {
     '',
     '## Thread so far (oldest first)',
     threadAsText(args.thread),
+    ...alternativeSection(args.previousDraft),
   ].join('\n')
 }
 
@@ -215,6 +233,7 @@ export function buildFollowUpPrompt(args: CounterDraftArgs): string {
     '',
     '## What the athlete already sent (oldest first)',
     threadAsText(args.thread),
+    ...alternativeSection(args.previousDraft),
   ].join('\n')
 }
 
