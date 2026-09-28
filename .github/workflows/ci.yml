@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    name: Lint, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      # Includes the database-level RLS/grants/invite tests (PGlite: the real
+      # Postgres engine in-process, all migrations applied).
+      - run: npm run test
+      - run: npm run build
+
+  rls:
+    name: RLS isolation (real Supabase)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # Only the services the tests use: Postgres (with every migration
+      # applied), Auth, and PostgREST behind Kong.
+      - run: >-
+          npx -y supabase@2 start -x
+          studio,storage-api,realtime,imgproxy,edge-runtime,logflare,vector,postgres-meta,supavisor,mailpit
+      - run: npm run test:rls

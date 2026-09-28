@@ -5,6 +5,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts'],
+    // Needs a running Supabase; run with `npm run test:rls`.
+    exclude: ['tests/integration/**'],
   },
   resolve: {
     alias: {
