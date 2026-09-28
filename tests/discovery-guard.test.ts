@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   DAILY_ATTEMPT_CEILING,
+  DAILY_FOCUSED_ATTEMPT_CEILING,
+  DAILY_FOCUSED_CAP,
   DAILY_RUN_CAP,
   STALE_RUN_MS,
   evaluateDiscoveryGuard,
@@ -14,10 +16,15 @@ const MIN = 60 * 1000
 const HOUR = 60 * MIN
 
 let n = 0
-const run = (status: GuardRun['status'], createdAgoMs: number): GuardRun => ({
+const run = (
+  status: GuardRun['status'],
+  createdAgoMs: number,
+  kind: GuardRun['kind'] = 'regular',
+): GuardRun => ({
   id: `run-${++n}`,
   status,
   created_at: ago(createdAgoMs),
+  kind,
 })
 
 describe('evaluateDiscoveryGuard', () => {
@@ -77,6 +84,35 @@ describe('evaluateDiscoveryGuard', () => {
   it('does not count a stale (dead) run toward the daily cap', () => {
     const runs = [run('completed', 2 * HOUR), run('completed', 3 * HOUR), run('running', 2 * HOUR)]
     expect(evaluateDiscoveryGuard(runs, now).allowed).toBe(true)
+  })
+})
+
+describe('focused searches', () => {
+  it(`have their own allowance of ${DAILY_FOCUSED_CAP} a day, separate from regular runs`, () => {
+    const regularDone = [run('completed', 1 * HOUR), run('completed', 2 * HOUR), run('completed', 3 * HOUR)]
+    expect(evaluateDiscoveryGuard(regularDone, now, 'regular')).toEqual({ allowed: false, reason: 'daily_cap' })
+    expect(evaluateDiscoveryGuard(regularDone, now, 'focused').allowed).toBe(true)
+
+    const focusedDone = [run('completed', 1 * HOUR, 'focused'), run('completed', 2 * HOUR, 'focused')]
+    expect(evaluateDiscoveryGuard(focusedDone, now, 'focused')).toEqual({ allowed: false, reason: 'focused_cap' })
+    expect(evaluateDiscoveryGuard(focusedDone, now, 'regular').allowed).toBe(true)
+  })
+
+  it('still allow only one run of either kind in flight', () => {
+    expect(evaluateDiscoveryGuard([run('running', MIN)], now, 'focused')).toEqual({
+      allowed: false,
+      reason: 'in_progress',
+    })
+    expect(evaluateDiscoveryGuard([run('queued', MIN, 'focused')], now, 'regular')).toEqual({
+      allowed: false,
+      reason: 'in_progress',
+    })
+  })
+
+  it('have their own failure ceiling', () => {
+    const failed = Array.from({ length: DAILY_FOCUSED_ATTEMPT_CEILING }, (_, i) => run('failed', (i + 1) * HOUR, 'focused'))
+    expect(evaluateDiscoveryGuard(failed, now, 'focused')).toEqual({ allowed: false, reason: 'too_many_attempts' })
+    expect(evaluateDiscoveryGuard(failed, now, 'regular').allowed).toBe(true)
   })
 })
 

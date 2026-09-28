@@ -80,6 +80,8 @@ export type BrandMatch = {
   status: MatchStatus
   // Added by the athlete (validated); private to their match.
   contact_email: string | null
+  // Set when found by the athlete's focused search (their text; private).
+  search_focus: string | null
   created_at: string
   updated_at: string
 }
@@ -109,10 +111,15 @@ export type Message = {
   created_at: string
 }
 
+export type DiscoveryRunKind = 'regular' | 'focused'
+
 export type DiscoveryRun = {
   id: string
   athlete_id: string
   status: DiscoveryRunStatus
+  kind: DiscoveryRunKind
+  // The athlete's search text for a focused run; null for regular runs.
+  focus: string | null
   params: Record<string, unknown>
   brands_found: number
   matches_created: number

@@ -37,6 +37,9 @@ export function MatchCard({ match, brand }: { match: BrandMatch; brand: Brand })
           {brand.domain}
         </a>
       </div>
+      {match.search_focus && (
+        <p className="mb-1 text-xs text-neutral-500">From your search: {match.search_focus}</p>
+      )}
       {brand.description && <p className="mb-2 text-sm text-neutral-600">{brand.description}</p>}
       <p className="mb-3 text-sm">
         <span className="font-medium">Why it fits: </span>

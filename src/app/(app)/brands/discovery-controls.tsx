@@ -12,6 +12,8 @@ interface Props {
     brands_found: number
     matches_created: number
     created_at: string
+    kind: string
+    focus: string | null
   } | null
   // Computed server-side: queued/running and not stale.
   inFlight: boolean
@@ -46,7 +48,8 @@ export function DiscoveryControls({ latestRun, inFlight }: Props) {
       <div className="flex items-center gap-3">
         {running && (
           <span className="text-sm text-neutral-500" aria-live="polite">
-            Researching brands… new matches show up here as they&apos;re found
+            {latestRun?.focus ? `Searching “${latestRun.focus}”…` : 'Researching brands…'} new
+            matches show up here as they&apos;re found
           </span>
         )}
         <button
@@ -59,7 +62,8 @@ export function DiscoveryControls({ latestRun, inFlight }: Props) {
       </div>
       {latestRun?.status === 'completed' && (
         <p className="text-xs text-neutral-500">
-          Last run: {latestRun.brands_found} brands researched, {latestRun.matches_created} matches
+          {latestRun.focus ? `Last search (“${latestRun.focus}”)` : 'Last run'}:{' '}
+          {latestRun.brands_found} brands researched, {latestRun.matches_created} matches
         </p>
       )}
       {latestRun?.status === 'failed' && !error && (

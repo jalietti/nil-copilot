@@ -9,9 +9,10 @@ import { reportError } from './observability/sentry'
 // booleans — enforced by these types and again by scrubAnalyticsProperties.
 export interface AnalyticsEvents {
   interview_completed: { first_time: boolean; voice_profile_generated: boolean }
-  discovery_run_started: { run_id: string }
+  discovery_run_started: { run_id: string; kind: 'regular' | 'focused' }
   discovery_run_completed: {
     run_id: string
+    kind: 'regular' | 'focused'
     brands_found: number
     matches_created: number
     matches_with_email: number

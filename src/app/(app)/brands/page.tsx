@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { DiscoveryControls } from './discovery-controls'
 import { MatchCard } from './match-card'
 import { SearchPreferences } from './search-preferences'
+import { FocusedSearch } from './focused-search'
 import { isRunInFlight } from '@/lib/discovery-guard'
 import type { Brand, BrandMatch } from '@/lib/supabase/types'
 
@@ -28,7 +29,7 @@ export default async function BrandsPage() {
       .order('created_at', { ascending: false }),
     supabase
       .from('discovery_runs')
-      .select('status, brands_found, matches_created, created_at')
+      .select('status, brands_found, matches_created, created_at, kind, focus')
       .eq('athlete_id', user.id)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -69,6 +70,7 @@ export default async function BrandsPage() {
           ((interview.raw_answers as { what_matters?: string } | null)?.what_matters ?? '').trim()
         }
       />
+      <FocusedSearch disabled={latestRun ? isRunInFlight(latestRun, new Date()) : false} />
       {matchList.length === 0 ? (
         <p className="text-sm text-neutral-600">
           No matches yet. Kick off discovery and the copilot will research brands that actually fit

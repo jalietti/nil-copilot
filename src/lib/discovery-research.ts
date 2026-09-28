@@ -18,6 +18,14 @@ export const DISCOVERY_LIMITS = {
   LOOKUPS_PER_TAG: 6,
 } as const
 
+// A focused search researches one athlete-chosen direction, so it goes deeper
+// on it than a regular run goes on each of its tags.
+export const FOCUSED_LIMITS = {
+  NEW_CANDIDATES: 5,
+  SOURCE_PAGES: 3,
+  LOOKUPS: 8,
+} as const
+
 // What discovery knows about the athlete when judging brands. Values are a
 // soft preference: they steer which brands are picked and how fit is judged,
 // but never rule out a strong match on the athlete's actual interests.
@@ -33,6 +41,12 @@ function valuesLines(values: string[], use: string): string[] {
 
 export function brandSearchQuery(tag: string): string {
   return `best small independent ${tag.replace(/-/g, ' ')} brands`
+}
+
+// The athlete's own words ("women-owned skincare") as a search.
+export function focusSearchQuery(focus: string): string {
+  const text = focus.trim()
+  return /\bbrands?\b/i.test(text) ? `best small independent ${text}` : `best small independent ${text} brands`
 }
 
 export function brandLookupQuery(brandName: string): string {

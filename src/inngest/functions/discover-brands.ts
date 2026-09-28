@@ -20,8 +20,10 @@ import {
 } from '@/lib/discovery'
 import {
   DISCOVERY_LIMITS,
+  FOCUSED_LIMITS,
   brandLookupQuery,
   brandSearchQuery,
+  focusSearchQuery,
   evaluateCandidate,
   extractBrandMentions,
 } from '@/lib/discovery-research'
@@ -94,16 +96,31 @@ export const discoverBrands = inngest.createFunction(
         .eq('athlete_id', athleteId)
         .maybeSingle()
       if (!data) throw new Error(`No interview found for athlete ${athleteId}`)
+      const { data: thisRun } = await supabase
+        .from('discovery_runs')
+        .select('kind, focus')
+        .eq('id', runId)
+        .single()
+      // Only regular runs advance the tag rotation.
       const { count } = await supabase
         .from('discovery_runs')
         .select('id', { count: 'exact', head: true })
         .eq('athlete_id', athleteId)
+        .eq('kind', 'regular')
         .eq('status', 'completed')
-      return { ...data, priorRuns: count ?? 0 }
+      return {
+        ...data,
+        priorRuns: count ?? 0,
+        kind: thisRun?.kind ?? 'regular',
+        focus: thisRun?.focus ?? null,
+      }
     })
+    const focus = interview.kind === 'focused' ? interview.focus : null
 
-    // 1. Cache first: match existing verified brands by category overlap.
+    // 1. Cache first: match existing verified brands by category overlap
+    // (regular runs only — a focused search is about a new direction).
     const cached = await run('match-from-cache', async () => {
+      if (focus) return []
       const { data: cached } = await supabase
         .from('brands')
         .select('id, domain, contact_email, contact_checked_at')
@@ -146,25 +163,33 @@ export const discoverBrands = inngest.createFunction(
       })
     }
 
-    // 2. Live research per category tag.
-    const tags = tagsForRun(
-      discoveryTags(interview.target_industries, interview.category_tags),
-      interview.priorRuns,
-      SEARCH_TAGS_PER_RUN,
-    )
+    // 2. Live research: the athlete's focused search, or this run's share of
+    // their industries + interest tags. A focused search goes deeper.
+    const topics = focus
+      ? [{ id: 'focus', tag: focus, query: focusSearchQuery(focus) }]
+      : tagsForRun(
+          discoveryTags(interview.target_industries, interview.category_tags),
+          interview.priorRuns,
+          SEARCH_TAGS_PER_RUN,
+        ).map((tag) => ({ id: tag, tag, query: brandSearchQuery(tag) }))
+    const limits = focus
+      ? {
+          candidates: FOCUSED_LIMITS.NEW_CANDIDATES,
+          sourcePages: FOCUSED_LIMITS.SOURCE_PAGES,
+          lookups: FOCUSED_LIMITS.LOOKUPS,
+        }
+      : { candidates: NEW_CANDIDATES_PER_TAG, sourcePages: SOURCE_PAGES_PER_TAG, lookups: LOOKUPS_PER_TAG }
     const athlete = { interests: interview.interests, values: interview.values }
     let brandsFound = 0
     const matchedBrandIds = [...cachedMatchIds]
 
-    for (const tag of tags) {
-      const results = await run(`search-${tag}`, () =>
-        tavilySearch(brandSearchQuery(tag)),
-      )
+    for (const { id, tag, query } of topics) {
+      const results = await run(`search-${id}`, () => tavilySearch(query))
 
       // Read the top pages and have Claude list the brands they mention —
       // the result domains themselves are mostly media, not brands.
-      const sources = await run(`sources-${tag}`, async () => {
-        const urls = sourcePageUrls(results, SOURCE_PAGES_PER_TAG)
+      const sources = await run(`sources-${id}`, async () => {
+        const urls = sourcePageUrls(results, limits.sourcePages)
         const pages = urls.length > 0 ? await tavilyExtract(urls) : []
         return pages.map((page) => ({
           url: page.url,
@@ -174,28 +199,28 @@ export const discoverBrands = inngest.createFunction(
       })
       if (sources.length === 0) continue
 
-      const mentions = await run(`mentions-${tag}`, () =>
+      const mentions = await run(`mentions-${id}`, () =>
         extractBrandMentions(sources, athlete, tag),
       )
 
-      const plan = await run(`plan-${tag}`, async () => {
+      const plan = await run(`plan-${id}`, async () => {
         const { data: known } = await supabase.from('brands').select('domain')
         return planBrandCandidates(mentions, {
           pageDomains: sources.flatMap((source) => source.linkDomains),
           knownDomains: (known ?? []).map((b) => b.domain),
-          limit: NEW_CANDIDATES_PER_TAG,
-          maxLookups: LOOKUPS_PER_TAG,
+          limit: limits.candidates,
+          maxLookups: limits.lookups,
         })
       })
 
       // Brands without a link in the page: one search each, accepted only if
       // a result's domain plausibly matches the brand name and it isn't
       // already cached. Stops as soon as the tag has enough candidates.
-      const candidates: BrandCandidate[] = plan.resolved.slice(0, NEW_CANDIDATES_PER_TAG)
+      const candidates: BrandCandidate[] = plan.resolved.slice(0, limits.candidates)
       for (const name of plan.needsLookup) {
-        if (candidates.length >= NEW_CANDIDATES_PER_TAG) break
+        if (candidates.length >= limits.candidates) break
         const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-        const domain = await run(`lookup-${tag}-${slug}`, async () => {
+        const domain = await run(`lookup-${id}-${slug}`, async () => {
           const found = pickBrandDomain(
             name,
             await tavilySearch(brandLookupQuery(name), { maxResults: 5 }),
@@ -242,7 +267,9 @@ export const discoverBrands = inngest.createFunction(
                 contact_email: contact.email,
                 contact_checked_at: new Date().toISOString(),
                 source_urls: [candidate.url],
-                discovered_via: `tavily:${tag}`,
+                // Brands are visible to every athlete: never record the
+                // athlete's own search text here.
+                discovered_via: focus ? 'tavily:focused-search' : `tavily:${tag}`,
                 verified_at: new Date().toISOString(),
               },
               { onConflict: 'domain' },
@@ -257,6 +284,7 @@ export const discoverBrands = inngest.createFunction(
                 athlete_id: athleteId,
                 brand_id: brand.id,
                 fit_reason: evaluation.fit_reason,
+                search_focus: focus,
               },
               { onConflict: 'athlete_id,brand_id', ignoreDuplicates: true },
             )
@@ -290,6 +318,7 @@ export const discoverBrands = inngest.createFunction(
         .not('contact_email', 'is', null)
       await track('discovery_run_completed', athleteId, {
         run_id: runId,
+        kind: focus ? 'focused' : 'regular',
         brands_found: brandsFound,
         matches_created: matchesCreated,
         matches_with_email: count ?? 0,

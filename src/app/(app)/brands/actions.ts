@@ -11,6 +11,8 @@ import { track } from '@/lib/analytics'
 import { reportError } from '@/lib/observability/sentry'
 import { hasValidMx, isUsableAthleteEmail } from '@/lib/contact-email'
 import { searchPreferencesSchema } from '@/lib/validators/interview'
+import { z } from 'zod'
+import type { DiscoveryRunKind } from '@/lib/supabase/types'
 import {
   DISCOVERY_BLOCK_MESSAGES,
   dailyWindowStart,
@@ -23,6 +25,26 @@ export type StartDiscoveryResult =
   | { ok: false; reason: DiscoveryBlockReason | 'error'; message: string }
 
 export async function startDiscovery(): Promise<StartDiscoveryResult> {
+  return startRun('regular', null)
+}
+
+const focusSchema = z
+  .string()
+  .trim()
+  .min(3, 'Describe what to search for (at least 3 characters)')
+  .max(100, 'Keep it under 100 characters')
+
+// A one-off search in a direction the athlete names ("women-owned skincare"),
+// with its own daily allowance on top of regular runs.
+export async function startFocusedSearch(rawFocus: string): Promise<StartDiscoveryResult> {
+  const parsed = focusSchema.safeParse(rawFocus)
+  if (!parsed.success) {
+    return { ok: false, reason: 'error', message: parsed.error.issues[0]?.message ?? 'Check your search' }
+  }
+  return startRun('focused', parsed.data)
+}
+
+async function startRun(kind: DiscoveryRunKind, focus: string | null): Promise<StartDiscoveryResult> {
   const supabase = await createClient()
   const {
     data: { user },
@@ -39,12 +61,12 @@ export async function startDiscovery(): Promise<StartDiscoveryResult> {
   const now = new Date()
   const { data: runs, error: runsError } = await supabase
     .from('discovery_runs')
-    .select('id, status, created_at')
+    .select('id, status, created_at, kind')
     .eq('athlete_id', user.id)
     .or(`status.in.(queued,running),created_at.gte.${dailyWindowStart(now)}`)
   if (runsError) return { ok: false, reason: 'error', message: runsError.message }
 
-  const guard = evaluateDiscoveryGuard(runs ?? [], now)
+  const guard = evaluateDiscoveryGuard(runs ?? [], now, kind)
   if (!guard.allowed) {
     return { ok: false, reason: guard.reason, message: DISCOVERY_BLOCK_MESSAGES[guard.reason] }
   }
@@ -61,7 +83,7 @@ export async function startDiscovery(): Promise<StartDiscoveryResult> {
 
   const { data: run, error } = await supabase
     .from('discovery_runs')
-    .insert({ athlete_id: user.id })
+    .insert({ athlete_id: user.id, kind, focus })
     .select('id')
     .single()
   if (error) {
@@ -78,7 +100,7 @@ export async function startDiscovery(): Promise<StartDiscoveryResult> {
       data: { athleteId: user.id, runId: run.id },
     })
   } catch (e) {
-    reportError(e, { action: 'startDiscovery' })
+    reportError(e, { action: 'startDiscovery', kind })
     // Never leave a queued row behind for a job that was never enqueued.
     await createAdminClient()
       .from('discovery_runs')
@@ -87,7 +109,7 @@ export async function startDiscovery(): Promise<StartDiscoveryResult> {
     return { ok: false, reason: 'error', message: 'Could not start discovery — try again' }
   }
 
-  after(() => track('discovery_run_started', user.id, { run_id: run.id }))
+  after(() => track('discovery_run_started', user.id, { run_id: run.id, kind }))
   revalidatePath('/brands')
   return { ok: true }
 }

@@ -66,6 +66,26 @@ describe('authenticated athlete: the app paths still work', () => {
     })
   })
 
+  it('discovery: enqueues a focused search with its text', async () => {
+    await asA(async (tx) => {
+      await tx.query(
+        `insert into discovery_runs (athlete_id, kind, focus) values ($1, 'focused', 'women-owned skincare')`,
+        [A],
+      )
+      const { rows } = await tx.query('select kind, focus from discovery_runs')
+      expect(rows).toEqual([{ kind: 'focused', focus: 'women-owned skincare' }])
+    })
+  })
+
+  it('discovery: kind and focus must agree', async () => {
+    await expect(
+      asA((tx) => tx.query(`insert into discovery_runs (athlete_id, kind) values ($1, 'focused')`, [A])),
+    ).rejects.toThrow(/check constraint/)
+    await expect(
+      asA((tx) => tx.query(`insert into discovery_runs (athlete_id, focus) values ($1, 'coffee')`, [A])),
+    ).rejects.toThrow(/check constraint/)
+  })
+
   it('deal thread: creates a deal, drafts, pastes a reply, edits, changes status', async () => {
     await asA(async (tx) => {
       const { rows } = await tx.query<{ id: string }>(

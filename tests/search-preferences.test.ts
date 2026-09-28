@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { discoveryTags } from '@/lib/discovery'
-import { buildEvaluationPrompt, buildMentionsPrompt } from '@/lib/discovery-research'
+import { buildEvaluationPrompt, buildMentionsPrompt, focusSearchQuery } from '@/lib/discovery-research'
 import { buildOutreachPrompt } from '@/lib/draft-email'
 import { normalizedTagsSchema, searchPreferencesSchema } from '@/lib/validators/interview'
 import type { Brand, Interview, Profile } from '@/lib/supabase/types'
@@ -70,5 +70,12 @@ describe('validation', () => {
     expect(normalizedTagsSchema.parse({ category_tags: ['a'], values: ['ocean conservation'] }).values).toEqual([
       'ocean conservation',
     ])
+  })
+})
+
+describe('focusSearchQuery', () => {
+  it("searches the athlete's own words for small independent brands", () => {
+    expect(focusSearchQuery(' women-owned skincare ')).toBe('best small independent women-owned skincare brands')
+    expect(focusSearchQuery('coffee brands from Oregon')).toBe('best small independent coffee brands from Oregon')
   })
 })
