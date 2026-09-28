@@ -232,6 +232,24 @@ Only after all eleven pass, send the codes.
 
 ---
 
+## Checking in during the pilot
+
+For a quick read of the numbers straight from the production database (no
+PostHog needed), export the production values and run the report:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=<production secret key> \
+npm run pilot:report
+```
+
+It prints counts only: signups per invite code, onboarding and interview
+completion, discovery runs and yields, matches with a usable email, deals by
+status, and the success signals below. It never prints names, visa status,
+or message text. Don't paste the secret key into a file in the repo;
+exporting it for the one command is enough. Mailto clicks and repeat visits
+are only in PostHog.
+
 ## What we're measuring
 
 The pilot succeeds if athletes get actionable matches, actually reach out,

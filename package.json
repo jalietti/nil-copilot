@@ -13,7 +13,8 @@
     "eval:discovery": "tsx --env-file-if-exists=.env.local scripts/discovery-eval.ts",
     "dev:local": "bash scripts/dev-local.sh",
     "db:reset": "npx -y supabase@2 db reset",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "pilot:report": "tsx --env-file-if-exists=.env.local scripts/pilot-report.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
