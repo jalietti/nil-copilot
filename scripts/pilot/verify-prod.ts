@@ -75,7 +75,14 @@ async function checkSupabase(ref: string) {
   const settings = (await (
     await fetch(`${url}/auth/v1/settings`, { headers: { apikey: publishableKey } })
   ).json()) as { mailer_autoconfirm?: boolean; disable_signup?: boolean; external?: Record<string, boolean> }
-  pass('Auth: email confirmation required', settings.mailer_autoconfirm === false, 'turn ON Authentication → Sign In / Providers → Email → Confirm email')
+  // The pilot runs with confirmation off (Supabase's built-in sender allows
+  // ~2 auth emails/hour project-wide); the app handles either setting.
+  record(
+    'PASS',
+    settings.mailer_autoconfirm === false
+      ? 'Auth: email confirmation ON (needs a custom SMTP sender for more than ~2 emails/hour)'
+      : 'Auth: email confirmation OFF (signup signs athletes in directly; invite codes still gate)',
+  )
   pass('Auth: email signups enabled', settings.disable_signup === false && settings.external?.email === true, 'enable the Email provider')
   const others = Object.entries(settings.external ?? {})
     .filter(([name, on]) => on && !['email', 'phone'].includes(name))

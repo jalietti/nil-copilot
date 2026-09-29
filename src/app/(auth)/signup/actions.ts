@@ -1,6 +1,7 @@
 'use server'
 
 import { headers } from 'next/headers'
+import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -32,7 +33,7 @@ export async function signUpWithInvite(raw: unknown): Promise<{ error?: string }
 
   const origin = (await headers()).get('origin') ?? ''
   const supabase = await createClient()
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
@@ -44,5 +45,9 @@ export async function signUpWithInvite(raw: unknown): Promise<{ error?: string }
   if (error) {
     return { error: isInviteRejection(error.message) ? INVITE_CODE_MESSAGES.invalid : error.message }
   }
+  // With email confirmation turned off in Supabase (the pilot's setting) the
+  // athlete is signed in right away; with it on, they get a confirmation
+  // email and the page says so.
+  if (data.session) redirect('/onboarding')
   return {}
 }

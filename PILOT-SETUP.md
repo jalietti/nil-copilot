@@ -63,18 +63,24 @@ at Vercel, Supabase, Inngest, Sentry, PostHog, Anthropic, and Tavily.
    | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | The **publishable** key (`sb_publishable_…`), or the legacy `anon` key |
    | `SUPABASE_SERVICE_ROLE_KEY` | The **secret** key (`sb_secret_…`), or the legacy `service_role` key. Server-only; never paste it anywhere public |
 
-## 3. Supabase Auth: enforce email confirmation and set URLs
+## 3. Supabase Auth: email confirmation and URLs
 
-1. **Authentication → Sign In / Providers → Email**: **Enable email provider**
-   ON, **Confirm email** ON. Disable every other provider.
-2. **Authentication → URL Configuration**:
+1. **Authentication → Sign In / Providers → Email**: Enable email provider ON.
+   **Confirm email: OFF for the pilot** (decided 2026-09-29). Supabase's
+   built-in email sender allows only about 2 auth emails per hour for the
+   whole project (confirmations, resends and password resets combined), so
+   with confirmation on, most signups would fail. Invite codes still gate
+   who can join; athletes are signed in right after signing up. Trade-offs:
+   an athlete who mistypes their email can't reset their password, and
+   password-reset emails still share the ~2/hour limit. To turn confirmation
+   back on later, first connect a custom SMTP sender (Authentication →
+   Emails → SMTP Settings; Resend is allowed for platform email) and raise
+   Authentication → Rate Limits; the app handles either setting.
+   Disable every other provider.
+2. **Authentication → URL Configuration** (required either way; password
+   resets use it):
    - Site URL: `$APP_URL`
    - Redirect URLs: add `$APP_URL/auth/callback`
-3. Heads-up on email volume: Supabase's built-in email sender is heavily
-   rate-limited (a few emails per hour). Fine for ~10 athletes, but stagger
-   signups instead of sending everyone the link at the same minute. If a
-   confirmation email doesn't arrive, wait an hour and have them sign up again.
-   A custom SMTP sender is out of scope for the pilot.
 
 ## 4. Inngest (background discovery jobs)
 
@@ -188,9 +194,9 @@ mint one extra for yourself).
 
 1. [ ] Open `$APP_URL/signup` and try a made-up code. You should get
    "That invite code isn't valid…".
-2. [ ] Sign up with a real code. You get "Check your email", the confirmation
-   email arrives, and the link lands you on onboarding. (If you try to log in
-   before confirming, it should refuse.)
+2. [ ] Sign up with a real code. With confirmation off (the pilot setting)
+   you go straight to onboarding. (With it on, you'd get "Check your email"
+   and a link instead.)
 3. [ ] Onboarding: choose **International student (F-1 visa)**. The amber
    visa guidance and the "not legal advice, talk to your DSO" disclaimer
    appear. Finish onboarding.
