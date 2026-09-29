@@ -4,6 +4,7 @@ import { Suspense, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { ResendConfirmation } from '@/components/resend-confirmation'
 
 export default function LoginPage() {
   return (
@@ -23,6 +24,8 @@ function LoginForm() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  // Unconfirmed account: offer a fresh confirmation email.
+  const [needsConfirmation, setNeedsConfirmation] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -31,7 +34,9 @@ function LoginForm() {
     const supabase = createClient()
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
-      setError(error.message)
+      const unconfirmed = error.code === 'email_not_confirmed' || /not confirmed/i.test(error.message)
+      setNeedsConfirmation(unconfirmed)
+      setError(unconfirmed ? 'Confirm your email first — use the link we sent you.' : error.message)
       setLoading(false)
       return
     }
@@ -73,10 +78,13 @@ function LoginForm() {
         </Link>
         {error && <p className="text-sm text-red-600">{error}</p>}
         {!error && linkFailed && (
-          <p className="text-sm text-red-600">
-            That email link is invalid or has expired. Log in, or request a new reset link.
+          <p className="text-sm text-neutral-700">
+            That email link couldn&apos;t sign you in — it may have expired, or been opened in a
+            different browser than the one you signed up in. If you were confirming your email,
+            it&apos;s probably confirmed already: try logging in. Otherwise, resend it below.
           </p>
         )}
+        {(needsConfirmation || linkFailed) && <ResendConfirmation email={email} />}
         <button
           type="submit"
           disabled={loading}

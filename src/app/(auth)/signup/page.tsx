@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { ResendConfirmation } from '@/components/resend-confirmation'
 import { signUpWithInvite } from './actions'
 
 export default function SignupPage() {
@@ -32,6 +33,10 @@ export default function SignupPage() {
         <p className="text-sm text-neutral-600">
           We sent a confirmation link to <strong>{email}</strong>. Click it to finish signing up.
         </p>
+        <p className="text-sm text-neutral-600">
+          It can take a few minutes. Didn&apos;t get it, or the link didn&apos;t work?
+        </p>
+        <ResendConfirmation email={email} />
       </main>
     )
   }

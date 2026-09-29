@@ -26,11 +26,12 @@ async function logIn(page: Page, email: string, password = SEED_PASSWORD) {
   await page.waitForURL('**/dashboard')
 }
 
-async function confirmationLink(email: string): Promise<string> {
+async function confirmationLink(email: string, atLeast = 1): Promise<string> {
   for (let attempt = 0; attempt < 20; attempt++) {
     const res = await fetch(`${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`)
     const { messages } = (await res.json()) as { messages: { ID: string }[] }
-    if (messages.length > 0) {
+    // Newest first; wait until the expected number of emails has arrived.
+    if (messages.length >= atLeast) {
       const message = await (await fetch(`${MAILPIT}/api/v1/message/${messages[0].ID}`)).json()
       const href = (message.HTML as string).match(/href="([^"]+)"/)?.[1]
       if (href) return href.replace(/&amp;/g, '&')
@@ -54,8 +55,21 @@ test('new athlete: invite-gated signup, confirmation, visa step, interview with 
   await page.getByLabel('Invite code').fill('localdev1')
   await page.getByRole('button', { name: 'Sign up' }).click()
   await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible()
+  await confirmationLink(email)
 
-  await page.goto(await confirmationLink(email))
+  // Before confirming: logging in says to confirm, and a fresh email can be
+  // requested (no invite code needed — the account exists).
+  await page.goto('/login')
+  await page.getByLabel('Email').fill(email)
+  await page.getByLabel('Password').fill('e2e-password-123')
+  await page.getByRole('button', { name: 'Log in' }).click()
+  await expect(page.getByText('Confirm your email first')).toBeVisible()
+  // Supabase allows one email per address per max_frequency (1s locally).
+  await page.waitForTimeout(1500)
+  await page.getByRole('button', { name: 'Resend confirmation email' }).click()
+  await expect(page.getByText(/Sent a new confirmation link/)).toBeVisible()
+
+  await page.goto(await confirmationLink(email, 2))
   await page.waitForURL('**/onboarding')
 
   await page.getByLabel('Full name').fill('Riley Test')
