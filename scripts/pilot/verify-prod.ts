@@ -5,6 +5,7 @@
 //
 // Uses the Supabase CLI login on this machine for keys (never printed).
 
+import { execFileSync } from 'node:child_process'
 import { parseArgs } from 'node:util'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/types'
@@ -69,6 +70,35 @@ async function checkApp(appUrl: string, supabaseUrl: string) {
   pass('Inngest is in cloud mode (not dev)', info.mode === 'cloud', `mode=${String(info.mode)} — INNGEST_DEV must not be set in Vercel`)
 }
 
+// Inngest's Vercel integration calls each deployment's own URL
+// (nil-copilot-<id>-<team>.vercel.app), not the production domain. If Vercel
+// Deployment Protection puts a login in front of those, Inngest can't run
+// jobs: discovery runs sit "queued" forever with no error anywhere.
+async function checkDeploymentReachable() {
+  let listing: string
+  try {
+    listing = execFileSync('npx', ['-y', 'vercel@latest', 'ls', 'nil-copilot'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+  } catch {
+    record('WARN', 'Deployment URLs reachable by Inngest', 'could not list deployments (npx vercel login?)')
+    return
+  }
+  const deploymentUrl = listing.match(/https:\/\/[a-z0-9-]+\.vercel\.app/)?.[0]
+  if (!deploymentUrl) {
+    record('WARN', 'Deployment URLs reachable by Inngest', 'no deployment found')
+    return
+  }
+  const res = await fetch(`${deploymentUrl}/api/inngest`, { redirect: 'manual' })
+  const location = res.headers.get('location') ?? ''
+  pass(
+    'Deployment URLs reachable by Inngest (no Vercel login wall)',
+    !(res.status >= 300 && res.status < 400 && location.includes('vercel.com/sso')),
+    'Vercel → Settings → Deployment Protection → Vercel Authentication: set "Only Preview Deployments" (or off)',
+  )
+}
+
 async function checkSupabase(ref: string) {
   const { url, publishableKey, secretKey } = supabaseProject(ref)
 
@@ -128,6 +158,7 @@ async function main() {
 
   await checkApp(appUrl, `https://${ref}.supabase.co`).catch((e) => record('FAIL', 'App reachable', String(e)))
   await checkSupabase(ref).catch((e) => record('FAIL', 'Supabase reachable', String(e)))
+  await checkDeploymentReachable().catch((e) => record('FAIL', 'Deployment URLs reachable', String(e)))
 
   for (const r of results) console.log(`${r.result.padEnd(4)}  ${r.check}${r.detail ? `\n      → ${r.detail}` : ''}`)
   console.log(
