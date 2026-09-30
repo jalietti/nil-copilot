@@ -105,8 +105,8 @@ async function checkSupabase(ref: string) {
   const settings = (await (
     await fetch(`${url}/auth/v1/settings`, { headers: { apikey: publishableKey } })
   ).json()) as { mailer_autoconfirm?: boolean; disable_signup?: boolean; external?: Record<string, boolean> }
-  // The pilot runs with confirmation off (Supabase's built-in sender allows
-  // ~2 auth emails/hour project-wide); the app handles either setting.
+  // The pilot runs with confirmation on through a custom SMTP sender
+  // (PILOT-SETUP.md step 3); the app handles either setting.
   record(
     'PASS',
     settings.mailer_autoconfirm === false

@@ -45,9 +45,9 @@ export async function signUpWithInvite(raw: unknown): Promise<{ error?: string }
   if (error) {
     return { error: isInviteRejection(error.message) ? INVITE_CODE_MESSAGES.invalid : error.message }
   }
-  // With email confirmation turned off in Supabase (the pilot's setting) the
-  // athlete is signed in right away; with it on, they get a confirmation
-  // email and the page says so.
+  // With email confirmation on (the pilot's setting) the athlete gets a
+  // confirmation email and the page says so; with it off in Supabase they're
+  // signed in right away.
   if (data.session) redirect('/onboarding')
   return {}
 }

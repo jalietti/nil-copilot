@@ -30,6 +30,11 @@ at Vercel, Supabase, Inngest, Sentry, PostHog, Anthropic, and Tavily.
 4. Note the production URL Vercel assigns (e.g. `https://nil-copilot.vercel.app`).
    Below this is called `$APP_URL`. If you attach a custom domain, use that
    instead everywhere `$APP_URL` appears.
+5. **Settings → Deployment Protection → Vercel Authentication: Disabled.**
+   Inngest calls each deployment's own URL (`nil-copilot-<id>-….vercel.app`);
+   with Vercel's login in front of those, discovery runs sit "queued" forever
+   with no error. The app has its own login and the Inngest endpoint only
+   accepts signed requests. `pilot:verify` checks this.
 
 ## 2. Create the production Supabase project and apply migrations
 
@@ -65,20 +70,26 @@ at Vercel, Supabase, Inngest, Sentry, PostHog, Anthropic, and Tavily.
 
 ## 3. Supabase Auth: email confirmation and URLs
 
-1. **Authentication → Sign In / Providers → Email**: Enable email provider ON.
-   **Confirm email: OFF for the pilot** (decided 2026-09-29). Supabase's
-   built-in email sender allows only about 2 auth emails per hour for the
-   whole project (confirmations, resends and password resets combined), so
-   with confirmation on, most signups would fail. Invite codes still gate
-   who can join; athletes are signed in right after signing up. Trade-offs:
-   an athlete who mistypes their email can't reset their password, and
-   password-reset emails still share the ~2/hour limit. To turn confirmation
-   back on later, first connect a custom SMTP sender (Authentication →
-   Emails → SMTP Settings; Resend is allowed for platform email) and raise
-   Authentication → Rate Limits; the app handles either setting.
-   Disable every other provider.
-2. **Authentication → URL Configuration** (required either way; password
-   resets use it):
+1. **Authentication → Sign In / Providers → Email**: Enable email provider ON,
+   **Confirm email ON**. Disable every other provider.
+2. **Connect a custom SMTP sender first** — Supabase's built-in sender only
+   delivers to your own team's addresses, about 2 emails per hour for the
+   whole project, so athletes would never get their confirmation link. For
+   the pilot (no domain yet) use a dedicated Gmail account:
+   - Create it (e.g. `nilcopilot.team@gmail.com`), turn on 2-Step
+     Verification, then create an App Password at
+     myaccount.google.com/apppasswords.
+   - **Authentication → Emails → SMTP Settings**: enable custom SMTP. Host
+     `smtp.gmail.com`, port `587`, username = the Gmail address, password =
+     the App Password, sender email = the Gmail address, sender name
+     `NIL Copilot`.
+   - **Authentication → Rate Limits**: emails per hour → `30`.
+   This sender is platform email only (confirmations, password resets) —
+   never brand outreach. Once you own a domain, swap it for Resend SMTP.
+   (If email ever breaks mid-pilot, turning Confirm email OFF is a safe
+   fallback: invite codes still gate signup and the app handles both.)
+3. **Authentication → URL Configuration** (confirmation and password-reset
+   links use it; without it they point at localhost):
    - Site URL: `$APP_URL`
    - Redirect URLs: add `$APP_URL/auth/callback`
 
@@ -194,9 +205,9 @@ mint one extra for yourself).
 
 1. [ ] Open `$APP_URL/signup` and try a made-up code. You should get
    "That invite code isn't valid…".
-2. [ ] Sign up with a real code. With confirmation off (the pilot setting)
-   you go straight to onboarding. (With it on, you'd get "Check your email"
-   and a link instead.)
+2. [ ] Sign up with a real code. You get "Check your email"; the email
+   arrives from the Gmail sender within a minute, and its link lands you on
+   onboarding (open it in the same browser).
 3. [ ] Onboarding: choose **International student (F-1 visa)**. The amber
    visa guidance and the "not legal advice, talk to your DSO" disclaimer
    appear. Finish onboarding.
