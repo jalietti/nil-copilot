@@ -91,7 +91,9 @@ at Vercel, Supabase, Inngest, Sentry, PostHog, Anthropic, and Tavily.
 3. **Authentication → URL Configuration** (confirmation and password-reset
    links use it; without it they point at localhost):
    - Site URL: `$APP_URL`
-   - Redirect URLs: add `$APP_URL/auth/callback`
+   - Redirect URLs: add `$APP_URL/**` (the wildcard matters: password-reset
+     links carry `?next=/reset-password`, and Supabase silently falls back
+     to the Site URL for any link that doesn't match)
 
 ## 4. Inngest (background discovery jobs)
 

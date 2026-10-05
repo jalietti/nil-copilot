@@ -163,7 +163,7 @@ async function main() {
   for (const r of results) console.log(`${r.result.padEnd(4)}  ${r.check}${r.detail ? `\n      → ${r.detail}` : ''}`)
   console.log(
     '\nNot checkable from here — confirm by hand: Supabase Auth → URL Configuration (Site URL = your app URL,' +
-      ' redirect URL = <app>/auth/callback), Sentry receiving events, PostHog receiving events.',
+      ' redirect URL = <app>/**), Sentry receiving events, PostHog receiving events.',
   )
   if (results.some((r) => r.result === 'FAIL')) process.exit(1)
 }
