@@ -8,6 +8,7 @@ import { draftOutreachEmail, draftCounterEmail, draftFollowUpEmail } from '@/lib
 import { track } from '@/lib/analytics'
 import { draftEditUpdate, regeneratedDraftUpdate } from '@/lib/draft-edits'
 import { draftKind, type DraftKind } from '@/lib/draft-kind'
+import { activeDraft, canMarkSent } from '@/lib/deal-thread'
 import { needsFollowUp, nextDealStatus } from '@/lib/deal-follow-up'
 import { reportError } from '@/lib/observability/sentry'
 import { withUsageContext } from '@/lib/usage'
@@ -207,11 +208,12 @@ export async function saveDraftEdits(
   const supabase = await createClient()
   const { data: message } = await supabase
     .from('messages')
-    .select('subject, content, athlete_edited, direction')
+    .select('subject, content, athlete_edited, direction, sent_at')
     .eq('id', messageId)
     .eq('deal_id', dealId)
     .maybeSingle()
   if (!message || message.direction !== 'outbound_draft') return { error: 'Draft not found' }
+  if (message.sent_at !== null) return { error: 'You already sent this one — it can’t be edited now' }
 
   const update = draftEditUpdate(message, parsed.data)
   if (!update) return {}
@@ -223,20 +225,39 @@ export async function saveDraftEdits(
 
 // The athlete confirms they clicked send in their own email client. The app
 // never sends anything itself — this only records what already happened.
-export async function markSent(dealId: string): Promise<{ error?: string }> {
+export async function markSent(dealId: string, messageId: string): Promise<{ error?: string }> {
   if (!isRecordId(dealId)) return { error: DEAL_NOT_FOUND }
+  if (!isRecordId(messageId)) return { error: 'Draft not found' }
   const { supabase, user } = await requireUser()
 
-  const { data: deal } = await supabase
-    .from('deals')
-    .select('brand_id, status')
-    .eq('id', dealId)
-    .maybeSingle()
+  const [{ data: deal }, { data: messages }] = await Promise.all([
+    supabase.from('deals').select('brand_id, status').eq('id', dealId).maybeSingle(),
+    supabase
+      .from('messages')
+      .select('id, direction, sent_at')
+      .eq('deal_id', dealId)
+      .order('created_at', { ascending: true }),
+  ])
   if (!deal) return { error: DEAL_NOT_FOUND }
+  const thread = messages ?? []
+  if (!canMarkSent(thread, messageId)) {
+    // A double click or a stale tab: it's already recorded as sent.
+    if (thread.some((m) => m.id === messageId && m.sent_at !== null)) return {}
+    return { error: 'Only your latest draft can be marked sent' }
+  }
+
+  const now = new Date().toISOString()
+  // This draft is now history, not an editable draft.
+  const { error: messageError } = await supabase
+    .from('messages')
+    .update({ sent_at: now })
+    .eq('id', messageId)
+    .is('sent_at', null)
+  if (messageError) return { error: saveFailed(messageError, 'markSent') }
 
   const newStatus = nextDealStatus(deal.status, 'marked_sent')
   // Starts (or, after a follow-up, restarts) the "did you hear back?" clock.
-  const sentAt = newStatus === 'sent' ? { sent_at: new Date().toISOString() } : {}
+  const sentAt = newStatus === 'sent' ? { sent_at: now } : {}
   const { error } = await supabase
     .from('deals')
     .update({ status: newStatus, ...sentAt })
@@ -359,9 +380,9 @@ export async function regenerateDraft(dealId: string, messageId: string): Promis
   const ctx = await loadDealContext(dealId)
   if ('error' in ctx) return { error: ctx.error }
 
-  const current = ctx.messages.at(-1)
-  if (!current || current.id !== messageId || current.direction !== 'outbound_draft') {
-    return { error: 'Only the latest draft can be redrafted' }
+  const current = activeDraft(ctx.messages)
+  if (!current || current.id !== messageId) {
+    return { error: 'Only your latest unsent draft can be redrafted' }
   }
   const before = ctx.messages.slice(0, -1)
   const kind = draftKind(before)
