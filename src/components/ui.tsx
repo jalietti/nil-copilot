@@ -204,7 +204,7 @@ export function Logo({ href = '/', compact = false }: { href?: string; compact?:
       >
         NC
       </span>
-      <span className={`display text-[22px] ${compact ? 'sr-only sm:not-sr-only' : ''}`}>NIL Copilot</span>
+      <span className={`display text-[22px] whitespace-nowrap ${compact ? 'sr-only sm:not-sr-only' : ''}`}>NIL Copilot</span>
     </Link>
   )
 }

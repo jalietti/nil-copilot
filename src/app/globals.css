@@ -30,6 +30,8 @@
   --wait-soft: #e9edf0;
   --focus: #2b438f;
   --band: #16212a;
+  --band-ink: #e7ecef;
+  --band-muted: #a3b0ba;
   color-scheme: light;
 }
 
@@ -86,6 +88,8 @@
   --color-wait-soft: var(--wait-soft);
   --color-focus: var(--focus);
   --color-band: var(--band);
+  --color-band-ink: var(--band-ink);
+  --color-band-muted: var(--band-muted);
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-barlow-condensed), var(--font-inter), sans-serif;
   --animate-pop: pop 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both;

@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { FieldError } from '@/components/ui'
+import { CheckIcon } from '@/components/icons'
 
 // Supabase's own wording is specific ("…after 43 seconds") where it can be;
 // its hourly project-wide email cap needs a plainer explanation.
@@ -49,22 +51,23 @@ export function ResendConfirmation({ email }: { email: string }) {
 
   if (state === 'sent') {
     return (
-      <p className="text-sm text-green-700">
-        Sent a new confirmation link to {email.trim()} — check your inbox and spam folder.
+      <p className="flex items-start gap-1.5 text-sm font-medium text-agreed">
+        <CheckIcon size={16} className="mt-px shrink-0" />
+        <span>Sent a new confirmation link to {email.trim()} — check your inbox and spam folder.</span>
       </p>
     )
   }
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1.5">
       <button
         type="button"
         onClick={resend}
         disabled={state === 'sending'}
-        className="self-start text-sm underline disabled:opacity-50"
+        className="self-start text-sm font-semibold text-accent-text disabled:opacity-50"
       >
         {state === 'sending' ? 'Sending…' : 'Resend confirmation email'}
       </button>
-      {message && <p className="text-sm text-red-600">{message}</p>}
+      {message && <FieldError>{message}</FieldError>}
     </div>
   )
 }

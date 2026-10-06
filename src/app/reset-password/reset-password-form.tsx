@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { Field, Notice, inputClass } from '@/components/ui'
 
 export function ResetPasswordForm() {
   const router = useRouter()
@@ -31,8 +32,7 @@ export function ResetPasswordForm() {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <label className="flex flex-col gap-1 text-sm">
-        New password
+      <Field label="New password">
         <input
           type="password"
           required
@@ -40,11 +40,10 @@ export function ResetPasswordForm() {
           autoComplete="new-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="rounded border border-neutral-300 px-3 py-2"
+          className={inputClass}
         />
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        Confirm new password
+      </Field>
+      <Field label="Confirm new password">
         <input
           type="password"
           required
@@ -52,14 +51,14 @@ export function ResetPasswordForm() {
           autoComplete="new-password"
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
-          className="rounded border border-neutral-300 px-3 py-2"
+          className={inputClass}
         />
-      </label>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      </Field>
+      {error && <Notice tone="error">{error}</Notice>}
       <button
         type="submit"
         disabled={saving}
-        className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
+        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-[10px] border border-transparent bg-accent text-[15px] font-semibold text-accent-ink transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-subtle"
       >
         {saving ? 'Saving…' : 'Save new password'}
       </button>
