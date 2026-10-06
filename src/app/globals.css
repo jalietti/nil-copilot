@@ -1,26 +1,163 @@
 @import "tailwindcss";
 
+/*
+ * Design tokens. Santa Clara palette: Bronco Red is the single accent and means
+ * "act here" (primary actions, the one thing that needs you). Errors use
+ * Terracotta plus an icon so they never read as a button. Stage colors differ
+ * in lightness as well as hue.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --bg: #f5f6f7;
+  --surface: #ffffff;
+  --surface-2: #eef1f3;
+  --line: #d0d5d9;
+  --line-soft: #e3e7ea;
+  --ink: #16212a;
+  --muted: #4d5c68;
+  --subtle: #5f6e7a;
+  --accent: #862633;
+  --accent-hover: #6e1e29;
+  --accent-ink: #ffffff;
+  --accent-text: #862633;
+  --accent-soft: #f6e8eb;
+  --warn: #b13e13;
+  --warn-soft: #fbede6;
+  --agreed: #27540c;
+  --agreed-soft: #e7f0dd;
+  --nego: #115d6f;
+  --nego-soft: #e0eef1;
+  --wait: #425766;
+  --wait-soft: #e9edf0;
+  --focus: #2b438f;
+  --band: #16212a;
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --bg: #0e1418;
+    --surface: #161f25;
+    --surface-2: #1e2930;
+    --line: #2f3d46;
+    --line-soft: #24313a;
+    --ink: #e7ecef;
+    --muted: #a3b0ba;
+    --subtle: #8c9aa5;
+    --accent: #a8283c;
+    --accent-hover: #be3349;
+    --accent-ink: #ffffff;
+    --accent-text: #f08a99;
+    --accent-soft: #3a1a20;
+    --warn: #f08c64;
+    --warn-soft: #3a2016;
+    --agreed: #9ccb6b;
+    --agreed-soft: #1f2e15;
+    --nego: #7fc6d6;
+    --nego-soft: #14303a;
+    --wait: #b5c2cc;
+    --wait-soft: #24313a;
+    --focus: #7ba6f0;
+    --band: #1e2930;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-text: var(--accent-text);
+  --color-accent-soft: var(--accent-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-agreed: var(--agreed);
+  --color-agreed-soft: var(--agreed-soft);
+  --color-nego: var(--nego);
+  --color-nego-soft: var(--nego-soft);
+  --color-wait: var(--wait);
+  --color-wait-soft: var(--wait-soft);
+  --color-focus: var(--focus);
+  --color-band: var(--band);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-barlow-condensed), var(--font-inter), sans-serif;
+  --animate-pop: pop 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  --animate-shimmer: shimmer 1.4s ease-in-out infinite;
+  --animate-slide: slide 1.6s ease-in-out infinite;
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@keyframes slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Page titles and big numbers: condensed, uppercase, athletic. */
+@utility display {
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  line-height: 0.95;
+}
+
+/* Small section labels. */
+@utility eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--subtle);
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
