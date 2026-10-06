@@ -29,6 +29,39 @@ export function dealStage(status: DealStatus) {
   return STAGES[status]
 }
 
+// The 4-step pipeline shown on the deal page's stepper: Outreach sent → They
+// replied → Negotiate → Agreed. `dead` mutes every step (the chip alone says
+// "Dead"); `agreed`/`closed` complete every step, including the last.
+export type DealStepState = 'done' | 'current' | 'next' | 'muted'
+
+export interface DealStep {
+  label: string
+  state: DealStepState
+}
+
+const PROGRESS_LABELS = ['Outreach sent', 'They replied', 'Negotiate', 'Agreed'] as const
+
+const PROGRESS_INDEX: Record<'draft' | 'sent' | 'reply_received' | 'negotiating', number> = {
+  draft: 0,
+  sent: 1,
+  reply_received: 2,
+  negotiating: 2,
+}
+
+export function dealProgress(status: DealStatus): DealStep[] {
+  if (status === 'dead') {
+    return PROGRESS_LABELS.map((label) => ({ label, state: 'muted' }))
+  }
+  if (status === 'agreed' || status === 'closed') {
+    return PROGRESS_LABELS.map((label) => ({ label, state: 'done' }))
+  }
+  const current = PROGRESS_INDEX[status]
+  return PROGRESS_LABELS.map((label, i) => ({
+    label,
+    state: i < current ? 'done' : i === current ? 'current' : 'next',
+  }))
+}
+
 export function isDealGroupKey(value: unknown): value is DealGroupKey {
   return DEAL_GROUPS.some((g) => g.key === value)
 }

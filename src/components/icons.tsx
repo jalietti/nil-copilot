@@ -128,6 +128,14 @@ export const GlobeIcon = (p: IconProps) => (
   </Icon>
 )
 
+export const MoreIcon = (p: IconProps) => (
+  <Icon fill="currentColor" stroke="none" {...p}>
+    <circle cx="5" cy="12" r="1.8" />
+    <circle cx="12" cy="12" r="1.8" />
+    <circle cx="19" cy="12" r="1.8" />
+  </Icon>
+)
+
 export const ExternalIcon = (p: IconProps) => (
   <Icon {...p}>
     <path d="M14 4h6v6M20 4l-9 9" />
