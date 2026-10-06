@@ -195,7 +195,7 @@ export function PageHeader({
   )
 }
 
-export function Logo({ href = '/' }: { href?: string }) {
+export function Logo({ href = '/', compact = false }: { href?: string; compact?: boolean }) {
   return (
     <Link href={href} className="flex items-center gap-2.5 text-ink no-underline">
       <span
@@ -204,7 +204,7 @@ export function Logo({ href = '/' }: { href?: string }) {
       >
         NC
       </span>
-      <span className="display text-[22px]">NIL Copilot</span>
+      <span className={`display text-[22px] ${compact ? 'sr-only sm:not-sr-only' : ''}`}>NIL Copilot</span>
     </Link>
   )
 }
