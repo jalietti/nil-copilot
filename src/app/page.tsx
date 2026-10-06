@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Logo, buttonClass, cardClass } from '@/components/ui'
 import { MailIcon, LockIcon, GlobeIcon } from '@/components/icons'
+import { LegalLinks } from '@/components/legal-page'
 
 export default function Home() {
   return (
@@ -174,6 +175,7 @@ export default function Home() {
         <div className="mx-auto flex max-w-[1200px] flex-wrap justify-between gap-3 px-5 py-6 text-sm text-muted sm:px-8">
           <span>Made by a Bronco.</span>
           <span>NIL Copilot gives general information, not legal or tax advice.</span>
+          <LegalLinks />
         </div>
       </footer>
     </div>
