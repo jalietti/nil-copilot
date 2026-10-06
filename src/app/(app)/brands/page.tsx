@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { DiscoveryControls } from './discovery-controls'
@@ -36,20 +35,7 @@ export default async function BrandsPage() {
       .maybeSingle(),
   ])
 
-  if (!interview) {
-    return (
-      <main>
-        <h1 className="mb-4 text-2xl font-semibold">Brand matches</h1>
-        <p className="text-sm text-neutral-600">
-          Do the{' '}
-          <Link href="/interview" className="underline">
-            interview
-          </Link>{' '}
-          first — that&apos;s how the copilot knows which brands to research for you.
-        </p>
-      </main>
-    )
-  }
+  if (!interview) redirect('/onboarding')
 
   const matchList = (matches ?? []) as (BrandMatch & { brands: Brand })[]
 

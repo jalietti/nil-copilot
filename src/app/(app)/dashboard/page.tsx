@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { needsFollowUp } from '@/lib/deal-follow-up'
 import { DEAL_GROUPS, dealStage, groupDeals, isDealGroupKey, type DealGroupKey } from '@/lib/deal-stage'
 import { relativeTime } from '@/lib/relative-time'
-import { ButtonLink, Monogram, Notice, PageHeader, StageChip, cardClass } from '@/components/ui'
+import { ButtonLink, Monogram, PageHeader, StageChip, cardClass } from '@/components/ui'
 import { ChevronRightIcon, PlusIcon } from '@/components/icons'
 import type { Brand, Deal, Message } from '@/lib/supabase/types'
 import { FollowUpPrompt } from './follow-up-prompt'
@@ -50,6 +50,7 @@ export default async function DashboardPage({ searchParams }: PageProps<'/dashbo
   ])
 
   if (!profile?.onboarding_completed_at) redirect('/onboarding')
+  if (!interview) redirect('/onboarding')
 
   const deals = (dealRows ?? []) as unknown as DealWithBrand[]
   const now = new Date()
@@ -88,18 +89,6 @@ export default async function DashboardPage({ searchParams }: PageProps<'/dashbo
           </ButtonLink>
         }
       />
-
-      {!interview && (
-        <Notice title="Finish the interview to unlock better matches">
-          <p>
-            The copilot needs a few answers to know which brands actually fit you.{' '}
-            <Link href="/interview" className="font-semibold text-accent-text underline">
-              Start the interview
-            </Link>
-            .
-          </p>
-        </Notice>
-      )}
 
       <section aria-label="Pipeline" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {TILE_KEYS.map((key) => {
