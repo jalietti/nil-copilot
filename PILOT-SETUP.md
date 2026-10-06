@@ -56,7 +56,7 @@ at Vercel, Supabase, Inngest, Sentry, PostHog, Anthropic, and Tavily.
    ```sql
    select count(*) from public.invite_codes;          -- 0, and no error
    select column_name from information_schema.columns
-    where table_name = 'discovery_runs' and column_name = 'focus';  -- 1 row (0013 applied)
+    where table_name = 'messages' and column_name = 'sent_at';  -- 1 row (0014 applied)
    ```
 
 4. Where the keys come from (**Project Settings → API Keys**, plus **Data API**

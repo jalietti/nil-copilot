@@ -126,7 +126,7 @@ async function checkSupabase(ref: string) {
     brands: 'contact_checked_at',
     brand_matches: 'contact_email, search_focus',
     deals: 'sent_at',
-    messages: 'previous_versions, original_content',
+    messages: 'previous_versions, original_content, sent_at',
     discovery_runs: 'kind, focus',
     invite_codes: 'code',
     brand_outcomes: 'brand_id',

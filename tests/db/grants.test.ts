@@ -86,7 +86,7 @@ describe('authenticated athlete: the app paths still work', () => {
     ).rejects.toThrow(/check constraint/)
   })
 
-  it('deal thread: creates a deal, drafts, pastes a reply, edits, changes status', async () => {
+  it('deal thread: creates a deal, drafts, edits, marks it sent, pastes a reply, changes status', async () => {
     await asA(async (tx) => {
       const { rows } = await tx.query<{ id: string }>(
         'insert into deals (athlete_id, brand_id) values ($1, $2) returning id',
@@ -102,12 +102,28 @@ describe('authenticated athlete: the app paths still work', () => {
            original_subject = 's', original_content = 'b' where id = $1`,
         [msg.rows[0].id],
       )
+      await tx.query(`update messages set sent_at = now() where id = $1`, [msg.rows[0].id])
       await tx.query(
         `insert into messages (deal_id, direction, content) values ($1, 'inbound_pasted', 'reply')`,
         [dealId],
       )
       await tx.query(`update deals set status = 'sent' where id = $1`, [dealId])
     })
+  })
+
+  it('deal thread: only an outbound draft can be marked sent', async () => {
+    await expect(
+      asA(async (tx) => {
+        const { rows } = await tx.query<{ id: string }>(
+          'insert into deals (athlete_id, brand_id) values ($1, $2) returning id',
+          [A, BRAND],
+        )
+        await tx.query(
+          `insert into messages (deal_id, direction, content, sent_at) values ($1, 'inbound_pasted', 'reply', now())`,
+          [rows[0].id],
+        )
+      }),
+    ).rejects.toThrow(/check constraint/)
   })
 })
 

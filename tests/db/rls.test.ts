@@ -116,6 +116,7 @@ describe("athlete A cannot modify athlete B's rows", () => {
 
   it('messages: update and delete affect nothing', async () => {
     expect(await affectedAsA(`update messages set content = 'x' where id = $1`, [B_MESSAGE])).toBe(0)
+    expect(await affectedAsA(`update messages set sent_at = now() where id = $1`, [B_MESSAGE])).toBe(0)
     expect(await affectedAsA(`delete from messages where id = $1`, [B_MESSAGE])).toBe(0)
   })
 
