@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { DAILY_FOCUSED_CAP } from '@/lib/discovery-guard'
+import { Button, Field, FieldError, inputClass } from '@/components/ui'
 import { startFocusedSearch } from './actions'
 
 // A one-off search in a direction the athlete names, beyond their saved
@@ -22,34 +23,36 @@ export function FocusedSearch({ disabled }: { disabled: boolean }) {
   }
 
   return (
-    <section className="mb-6 rounded border border-neutral-200 p-4">
-      <h2 className="mb-1 font-medium">Search a specific direction</h2>
-      <p className="mb-3 text-sm text-neutral-600">
-        Looking for something your interests don&apos;t cover? Describe it and the copilot will
-        research it just this once. {DAILY_FOCUSED_CAP} a day, on top of your regular runs.
-      </p>
-      <form onSubmit={submit} className="flex flex-wrap items-center gap-2">
-        <input
-          value={focus}
-          onChange={(e) => setFocus(e.target.value)}
-          placeholder="e.g. women-owned skincare, specialty coffee"
-          maxLength={100}
-          aria-label="What to search for"
-          className="min-w-0 flex-1 rounded border border-neutral-300 px-3 py-2 text-sm"
-        />
-        <button
+    <section className="flex flex-col gap-3">
+      <form onSubmit={submit} className="flex flex-col gap-2">
+        <Field
+          label={
+            <>
+              Focus the next search <span className="font-normal text-muted">(optional)</span>
+            </>
+          }
+          hint="Describe it however you like: a category, a vibe, a place. This search adds to your matches and replaces nothing."
+        >
+          <input
+            value={focus}
+            onChange={(e) => setFocus(e.target.value)}
+            placeholder="e.g. local coffee roasters in the Bay Area"
+            maxLength={100}
+            className={inputClass}
+          />
+        </Field>
+        {error && <FieldError>{error}</FieldError>}
+        <Button
           type="submit"
           disabled={pending || disabled || focus.trim().length < 3}
-          className="rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
+          className="self-start"
         >
           {pending ? 'Starting…' : 'Search'}
-        </button>
+        </Button>
       </form>
-      {error && (
-        <p className="mt-2 text-sm text-red-600" role="alert">
-          {error}
-        </p>
-      )}
+      <p className="text-[13px] text-muted">
+        {DAILY_FOCUSED_CAP} a day, on top of your regular runs.
+      </p>
     </section>
   )
 }
