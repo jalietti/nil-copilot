@@ -2,7 +2,6 @@
 
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
@@ -11,12 +10,8 @@ import {
   isInviteRejection,
   normalizeInviteCode,
 } from '@/lib/invite-codes'
-
-const signupSchema = z.object({
-  email: z.string().trim().email('Enter a valid email'),
-  password: z.string().min(8, 'Password must be at least 8 characters').max(200),
-  inviteCode: z.string().trim().min(1, 'An invite code is required').max(64),
-})
+import { LEGAL_VERSION } from '@/lib/legal'
+import { signupSchema } from '@/lib/validators/signup'
 
 export async function signUpWithInvite(raw: unknown): Promise<{ error?: string }> {
   const parsed = signupSchema.safeParse(raw)
@@ -38,8 +33,14 @@ export async function signUpWithInvite(raw: unknown): Promise<{ error?: string }
     password: parsed.data.password,
     options: {
       emailRedirectTo: `${origin}/auth/callback`,
-      // Checked and consumed by the auth.users trigger — the actual gate.
-      data: { invite_code: code },
+      // invite_code is checked and consumed by the auth.users trigger — the
+      // actual gate. The terms fields record which Terms + Privacy Policy
+      // version the athlete agreed to, and when.
+      data: {
+        invite_code: code,
+        terms_version: LEGAL_VERSION,
+        terms_accepted_at: new Date().toISOString(),
+      },
     },
   })
   if (error) {
