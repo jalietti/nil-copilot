@@ -92,6 +92,16 @@ export default function PrivacyPage() {
         </p>
       </LegalSection>
 
+      <LegalSection title="Cookies and tracking">
+        <p>
+          We use one cookie: the sign-in cookie that keeps you logged in. It’s required for the app
+          to work, so there’s nothing to opt out of. We don’t use advertising or cross-site tracking
+          cookies, and we don’t run analytics scripts in your browser. Because we don’t track you
+          across other sites, our behavior is the same whether or not your browser sends a “Do Not
+          Track” signal.
+        </p>
+      </LegalSection>
+
       <LegalSection title="Keeping and deleting your data">
         <p>
           We keep your data while your account is open. Deleting your account (Account page →
