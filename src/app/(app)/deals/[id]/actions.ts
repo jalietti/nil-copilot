@@ -11,14 +11,28 @@ import { draftKind, type DraftKind } from '@/lib/draft-kind'
 import { needsFollowUp, nextDealStatus } from '@/lib/deal-follow-up'
 import { reportError } from '@/lib/observability/sentry'
 import { withUsageContext } from '@/lib/usage'
+import { checkDailyAllowance } from '@/lib/usage-guard'
 import type { Brand, Deal, DealStatus, Interview, Message, Profile } from '@/lib/supabase/types'
 
-// Drafting calls are recorded (owner-only api_usage) against the athlete.
-function drafting<T>(athleteId: string, fn: () => Promise<T>): Promise<T> {
+class DailyDraftLimitReached extends Error {}
+
+// Drafting calls are recorded (owner-only api_usage) against the athlete, and
+// refused once the athlete hits today's draft limit (usage-guard).
+async function drafting<T>(athleteId: string, fn: () => Promise<T>): Promise<T> {
+  const blocked = await checkDailyAllowance('draft', athleteId)
+  if (blocked) throw new DailyDraftLimitReached(blocked)
   return withUsageContext({ source: 'draft', athleteId }, fn)
 }
 
 const DRAFTING_FAILED = 'The copilot couldn’t write a draft just now — try again in a minute.'
+
+// The athlete-facing message for a failed draft. Hitting the daily limit is
+// expected, so only real failures are reported.
+function draftingError(e: unknown, action: string): string {
+  if (e instanceof DailyDraftLimitReached) return e.message
+  reportError(e, { action })
+  return DRAFTING_FAILED
+}
 
 function trackStatusChange(athleteId: string, dealId: string, from: DealStatus, to: DealStatus) {
   if (from === to) return
@@ -105,8 +119,7 @@ export async function generateOutreachDraft(dealId: string): Promise<{ error?: s
       }),
     )
   } catch (e) {
-    reportError(e, { action: 'generateOutreachDraft' })
-    return { error: DRAFTING_FAILED }
+    return { error: draftingError(e, 'generateOutreachDraft') }
   }
 
   const supabase = await createClient()
@@ -146,8 +159,7 @@ export async function generateCounterDraft(dealId: string): Promise<{ error?: st
       }),
     )
   } catch (e) {
-    reportError(e, { action: 'generateCounterDraft' })
-    return { error: DRAFTING_FAILED }
+    return { error: draftingError(e, 'generateCounterDraft') }
   }
 
   const supabase = await createClient()
@@ -291,8 +303,7 @@ export async function generateFollowUpDraft(dealId: string): Promise<{ error?: s
       }),
     )
   } catch (e) {
-    reportError(e, { action: 'generateFollowUpDraft' })
-    return { error: DRAFTING_FAILED }
+    return { error: draftingError(e, 'generateFollowUpDraft') }
   }
 
   const supabase = await createClient()
@@ -354,8 +365,7 @@ export async function regenerateDraft(dealId: string, messageId: string): Promis
           : draftFollowUpEmail({ ...shared, thread: before }),
     )
   } catch (e) {
-    reportError(e, { action: 'regenerateDraft' })
-    return { error: DRAFTING_FAILED }
+    return { error: draftingError(e, 'regenerateDraft') }
   }
 
   const supabase = await createClient()

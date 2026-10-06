@@ -7,6 +7,7 @@ import { interviewSchema } from '@/lib/validators/interview'
 import { fallbackTags, normalizeInterview } from '@/lib/normalize-interview'
 import { generateVoiceProfile } from '@/lib/voice-profile'
 import { withUsageContext } from '@/lib/usage'
+import { checkDailyAllowance } from '@/lib/usage-guard'
 import { track } from '@/lib/analytics'
 import { reportError } from '@/lib/observability/sentry'
 
@@ -25,6 +26,10 @@ export async function submitInterview(raw: unknown): Promise<InterviewActionResu
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Please check your answers' }
   }
+
+  // Checked before any call; the answers stay in the form, so nothing is lost.
+  const blocked = await checkDailyAllowance('interview', user.id)
+  if (blocked) return { error: blocked }
 
   // Independent Claude calls; either failing must not lose the answers.
   const [tagsResult, voiceResult] = await withUsageContext(
