@@ -39,7 +39,7 @@ async function createAthlete(): Promise<string> {
 async function recordCalls(athleteId: string, count: number, source: string, hoursAgo = 0) {
   const created_at = new Date(Date.now() - hoursAgo * HOUR_MS).toISOString()
   const rows = Array.from({ length: count }, () => ({
-    provider: 'anthropic',
+    provider: 'anthropic' as const,
     operation: 'messages',
     source,
     athlete_id: athleteId,
