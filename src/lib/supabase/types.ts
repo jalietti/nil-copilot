@@ -108,6 +108,9 @@ export type Message = {
   original_content: string | null
   // Versions replaced by "Try another version" (see draft-edits.ts).
   previous_versions: unknown[]
+  // When the athlete confirmed sending this draft from their own email
+  // client ("I sent it"). Null = not confirmed. Outbound drafts only.
+  sent_at: string | null
   created_at: string
 }
 
