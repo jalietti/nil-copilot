@@ -72,23 +72,33 @@ test('new athlete: invite-gated signup, confirmation, visa step, interview with 
   await page.goto(await confirmationLink(email, 2))
   await page.waitForURL('**/onboarding')
 
+  // Onboarding is one 4-step flow: about you, citizenship/visa, interests,
+  // deal preferences.
+  await page.getByRole('button', { name: 'Continue' }).click()
+  await expect(page.getByText('Name is required')).toBeVisible()
   await page.getByLabel('Full name').fill('Riley Test')
-  await page.getByLabel('Citizenship / visa status').selectOption('f1_visa')
+  await page.getByLabel('School').fill('Test State University')
+  await page.getByLabel('Sport', { exact: true }).fill('Swimming')
+  await page.getByLabel('Instagram').fill('1.2k')
+  await page.getByRole('button', { name: 'Continue' }).click()
+
+  // The visa step can't be skipped and shows real guidance.
+  await expect(page.getByRole('button', { name: 'Continue' })).toBeDisabled()
+  await page.getByRole('radio', { name: 'International student (F-1 visa)' }).check()
   await expect(page.getByText('NIL income on an F-1 visa needs real care')).toBeVisible()
   await expect(page.getByText('not legal or immigration advice')).toBeVisible()
   await expect(page.getByText('Anonymous brand-response outcomes')).toBeVisible()
-  await page.getByLabel('School').fill('Test State University')
-  await page.getByLabel('Sport', { exact: true }).fill('Swimming')
-  await page.getByRole('button', { name: 'Continue to interview' }).click()
-  await page.waitForURL('**/interview')
+  await page.getByRole('button', { name: 'Continue' }).click()
 
+  await page.getByLabel('What are you genuinely into?').fill('open water swimming, reef-safe sunscreen')
+  await page.getByRole('button', { name: 'Continue' }).click()
   await expect(page.getByText('How your answers are used')).toBeVisible()
-  await page.getByLabel('What are you genuinely into?').fill('open water swimming\nreef-safe sunscreen')
-  await page.getByRole('button', { name: 'Save and find brands' }).click()
+  await page.getByRole('button', { name: 'Finish and find brands' }).click()
   await page.waitForURL('**/brands')
-  await expect(page.getByRole('button', { name: 'Find new brands' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Find more brands' })).toBeVisible()
 
-  // Values pre-filled from the interview; editable separately, with industries.
+  // Values pre-filled from the interview; editable in the Tune search drawer.
+  await page.getByRole('button', { name: 'Tune search' }).click()
   const lookingFor = page.locator('section').filter({ hasText: "What you're looking for" })
   await expect(lookingFor.getByText('(from your interview)')).toBeVisible()
   await expect(lookingFor.getByText('ocean conservation')).toBeVisible()
@@ -125,7 +135,7 @@ test('seeded athlete: follow-up prompt, draft, regenerate, edit, reply, counter,
   await expect(body).toHaveValue(/E2E OUTREACH DRAFT/)
   await expect(page.getByText('Optional: if they write back')).toBeVisible()
   await expect(page.getByText('Visa check')).toBeHidden()
-  const mailto = page.getByRole('link', { name: 'Open in your email app' })
+  const mailto = page.getByRole('link', { name: 'Open in my email' })
   await expect(mailto).toHaveAttribute('href', /^mailto:press@glassreef\.test\?subject=E2E%20outreach%20subject/)
 
   // Try another version replaces the draft in place.
@@ -135,18 +145,22 @@ test('seeded athlete: follow-up prompt, draft, regenerate, edit, reply, counter,
   // Edit and save: the draft is marked as edited by the athlete.
   await body.fill('My own words for Glass Reef.')
   await page.getByRole('button', { name: 'Save edits' }).click()
-  await expect(page.getByText('(edited by you)')).toBeVisible()
+  await expect(page.getByText(/edited by you/)).toBeVisible()
   await expect(mailto).toHaveAttribute('href', /My%20own%20words/)
 
   // Sent -> reply pasted -> counter drafted.
-  await page.getByRole('button', { name: 'I sent it ✓' }).click()
-  await expect(page.getByText('sent', { exact: true })).toBeVisible()
+  // Only the athlete's own "I sent it" marks it sent; then the peak moment.
+  await page.getByRole('button', { name: 'I sent it' }).click()
+  await expect(page.getByRole('heading', { name: 'Sent. Nice work.' })).toBeVisible()
+  await expect(page.getByText('Waiting', { exact: true })).toBeVisible()
   await page.locator('#reply textarea').fill('Hi Maya, we can send a mask and fins for two posts.')
   await page.getByRole('button', { name: 'Save reply' }).click()
-  await expect(page.getByText('reply received', { exact: true })).toBeVisible()
+  // The sent moment clears once a newer message lands.
+  await expect(page.getByRole('heading', { name: 'Sent. Nice work.' })).toBeHidden()
+  await expect(page.getByText('Reply received', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Draft my reply' }).click()
   await expect(page.getByLabel('Body')).toHaveValue(/E2E COUNTER DRAFT/)
-  await expect(page.getByText('negotiating', { exact: true })).toBeVisible()
+  await expect(page.getByText('Negotiating', { exact: true })).toBeVisible()
   // Maya is on an F-1 visa: once a deal is live, the DSO reminder shows.
   await expect(page.getByText('Visa check')).toBeVisible()
   await expect(page.getByText(/check it with your Designated School Official/)).toBeVisible()

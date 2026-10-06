@@ -151,7 +151,7 @@ export default async function DashboardPage({ searchParams }: PageProps<'/dashbo
                   key={option.key}
                   href={isAll ? '/dashboard' : `/dashboard?stage=${option.key}`}
                   aria-current={active ? 'page' : undefined}
-                  className={`flex h-9 items-center rounded-[9px] px-3.5 text-sm font-semibold ${
+                  className={`flex h-11 items-center rounded-[9px] px-3.5 text-sm font-semibold ${
                     active ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'
                   }`}
                 >

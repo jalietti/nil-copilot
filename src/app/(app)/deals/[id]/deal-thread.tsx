@@ -57,9 +57,13 @@ export function DealThread({
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [reply, setReply] = useState('')
-  const [justSent, setJustSent] = useState(false)
+  // The id of the draft the athlete just confirmed sending. The "Sent" moment
+  // shows only while that draft is still the latest message, so it clears
+  // as soon as a reply is pasted or a new draft is generated.
+  const [sentDraftId, setSentDraftId] = useState<string | null>(null)
 
   const last = messages.at(-1)
+  const justSent = sentDraftId !== null && sentDraftId === last?.id
   const activeDraft = last?.direction === 'outbound_draft' ? last : null
   const priorMessages = activeDraft ? messages.slice(0, -1) : messages
 
@@ -75,7 +79,7 @@ export function DealThread({
     <div className="flex flex-col gap-6">
       <Link
         href="/dashboard"
-        className="inline-flex h-8 items-center gap-1.5 self-start text-sm font-semibold text-muted hover:text-ink"
+        className="inline-flex h-11 items-center gap-1.5 self-start text-sm font-semibold text-muted hover:text-ink"
       >
         <ArrowLeftIcon size={16} />
         All deals
@@ -178,7 +182,7 @@ export function DealThread({
               kind={draftKind(messages.slice(0, -1))}
               pending={pending}
               run={run}
-              onSent={() => setJustSent(true)}
+              onSent={() => setSentDraftId(activeDraft.id)}
             />
           ) : dealStatus === 'dead' ? (
             // Closed out: no red call to action pulling the athlete back in.
@@ -328,7 +332,7 @@ function DraftEditor({ dealId, draft, contactEmail, kind, pending, run, onSent }
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Button
           variant="ghost"
-          size="sm"
+
           disabled={pending}
           onClick={() => {
             const edited = dirty || draft.athlete_edited
@@ -341,7 +345,7 @@ function DraftEditor({ dealId, draft, contactEmail, kind, pending, run, onSent }
         </Button>
         <Button
           variant="ghost"
-          size="sm"
+
           disabled={pending || !dirty}
           onClick={() => run(() => saveDraftEdits(draft.id, dealId, subject, body))}
         >

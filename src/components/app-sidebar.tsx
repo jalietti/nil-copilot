@@ -49,12 +49,15 @@ export function AppSidebar({ name, matchesToReview }: { name: string; matchesToR
             <Icon />
             <span className="md:grow">{label}</span>
             {href === '/brands' && matchesToReview > 0 && (
-              <span
-                className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold text-muted"
-                aria-label={`${matchesToReview} matches to review`}
-              >
-                {matchesToReview}
-              </span>
+              <>
+                <span
+                  aria-hidden="true"
+                  className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold text-muted"
+                >
+                  {matchesToReview}
+                </span>
+                <span className="sr-only">, {matchesToReview} matches to review</span>
+              </>
             )}
           </Link>
         )
@@ -91,6 +94,7 @@ function AccountMenu({ name, initials }: { name: string; initials: string }) {
         type="button"
         aria-expanded={open}
         aria-haspopup="menu"
+        aria-label={`Account menu${name ? ` for ${name}` : ''}`}
         onClick={() => setOpen((o) => !o)}
         className={`${navItem} w-full`}
       >

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import type { ComponentProps, ReactNode } from 'react'
+import { Children, cloneElement, isValidElement, useId, type ComponentProps, type ReactNode } from 'react'
 import { dealStage, type StageTone } from '@/lib/deal-stage'
 import type { DealStatus } from '@/lib/supabase/types'
 import { AlertIcon, InfoIcon } from './icons'
@@ -67,29 +67,53 @@ export const inputClass =
 
 export const textareaClass = `${inputClass} py-3 leading-relaxed`
 
+// Label, hint, control, error. The hint and error sit outside the <label> and
+// are linked with aria-describedby, so the control's accessible name stays
+// just its label (screen readers hear "Sport", then the hint or error).
 export function Field({
   label,
   hint,
+  error,
   children,
   className = '',
 }: {
   label: ReactNode
   hint?: ReactNode
+  error?: ReactNode
   children: ReactNode
   className?: string
 }) {
+  const id = useId()
+  const only = Children.count(children) === 1 ? Children.toArray(children)[0] : null
+  const control = isValidElement<{ id?: string }>(only) ? only : null
+  const controlId = control?.props.id ?? `${id}-control`
+  const hintId = hint ? `${id}-hint` : undefined
+  const errorId = error ? `${id}-error` : undefined
+  const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined
+
   return (
-    <label className={`flex flex-col gap-1.5 text-sm font-semibold text-ink ${className}`}>
-      <span>{label}</span>
-      {hint && <span className="text-[13px] leading-snug font-normal text-muted">{hint}</span>}
-      {children}
-    </label>
+    <div className={`flex flex-col gap-1.5 text-sm font-semibold text-ink ${className}`}>
+      <label htmlFor={control ? controlId : undefined}>{label}</label>
+      {hint && (
+        <span id={hintId} className="text-[13px] leading-snug font-normal text-muted">
+          {hint}
+        </span>
+      )}
+      {control
+        ? cloneElement(control as React.ReactElement<Record<string, unknown>>, {
+            id: controlId,
+            'aria-describedby': describedBy,
+            'aria-invalid': error ? true : undefined,
+          })
+        : children}
+      {error && <FieldError id={errorId}>{error}</FieldError>}
+    </div>
   )
 }
 
-export function FieldError({ children }: { children: ReactNode }) {
+export function FieldError({ children, id }: { children: ReactNode; id?: string }) {
   return (
-    <p role="alert" className="flex items-start gap-1.5 text-[13px] font-medium text-warn">
+    <p id={id} role="alert" className="flex items-start gap-1.5 text-[13px] font-medium text-warn">
       <AlertIcon size={16} className="mt-px shrink-0" />
       <span>{children}</span>
     </p>
@@ -197,7 +221,7 @@ export function PageHeader({
 
 export function Logo({ href = '/', compact = false }: { href?: string; compact?: boolean }) {
   return (
-    <Link href={href} className="flex items-center gap-2.5 text-ink no-underline">
+    <Link href={href} className="-my-[7px] flex items-center gap-2.5 py-[7px] text-ink no-underline">
       <span
         aria-hidden="true"
         className="grid size-[30px] place-items-center rounded-lg bg-accent font-display text-base font-bold text-white"

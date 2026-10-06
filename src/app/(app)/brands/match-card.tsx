@@ -45,7 +45,7 @@ export function MatchCard({
             href={`https://${brand.domain}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-[13px] text-muted hover:text-ink"
+            className="-my-3 inline-flex items-center gap-1 py-3 text-[13px] text-muted hover:text-ink"
           >
             {brand.domain}
             <ExternalIcon size={14} />

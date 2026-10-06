@@ -196,7 +196,7 @@ export type ProfileFormState = ReturnType<typeof useProfileForm>
 export function ProfileStep1Fields({ form }: { form: ProfileFormState }) {
   return (
     <>
-      <Field label="Full name">
+      <Field label="Full name" error={form.fieldErrors.full_name}>
         <input
           required
           autoComplete="name"
@@ -204,28 +204,25 @@ export function ProfileStep1Fields({ form }: { form: ProfileFormState }) {
           onChange={(e) => form.setFullName(e.target.value)}
           className={inputClass}
         />
-        {form.fieldErrors.full_name && <FieldError>{form.fieldErrors.full_name}</FieldError>}
       </Field>
 
-      <Field label="School">
+      <Field label="School" error={form.fieldErrors.school}>
         <input
           required
           value={form.school}
           onChange={(e) => form.setSchool(e.target.value)}
           className={inputClass}
         />
-        {form.fieldErrors.school && <FieldError>{form.fieldErrors.school}</FieldError>}
       </Field>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Sport">
+        <Field label="Sport" error={form.fieldErrors.sport}>
           <input
             required
             value={form.sport}
             onChange={(e) => form.setSport(e.target.value)}
             className={inputClass}
           />
-          {form.fieldErrors.sport && <FieldError>{form.fieldErrors.sport}</FieldError>}
         </Field>
         <Field label={<>Division <span className="font-normal text-muted">(optional)</span></>}>
           <input
@@ -242,7 +239,7 @@ export function ProfileStep1Fields({ form }: { form: ProfileFormState }) {
           Followers <span className="text-[13px] font-normal text-muted">Leave blank if none. Small counts are fine.</span>
         </legend>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Field label="Instagram">
+          <Field label="Instagram" error={form.fieldErrors.instagram}>
             <input
               inputMode="numeric"
               value={form.instagram}
@@ -250,25 +247,22 @@ export function ProfileStep1Fields({ form }: { form: ProfileFormState }) {
               placeholder="e.g. 450 or 1.2k"
               className={inputClass}
             />
-            {form.fieldErrors.instagram && <FieldError>{form.fieldErrors.instagram}</FieldError>}
           </Field>
-          <Field label="TikTok">
+          <Field label="TikTok" error={form.fieldErrors.tiktok}>
             <input
               inputMode="numeric"
               value={form.tiktok}
               onChange={(e) => form.setTiktok(e.target.value)}
               className={inputClass}
             />
-            {form.fieldErrors.tiktok && <FieldError>{form.fieldErrors.tiktok}</FieldError>}
           </Field>
-          <Field label="Other">
+          <Field label="Other" error={form.fieldErrors.other}>
             <input
               inputMode="numeric"
               value={form.other}
               onChange={(e) => form.setOther(e.target.value)}
               className={inputClass}
             />
-            {form.fieldErrors.other && <FieldError>{form.fieldErrors.other}</FieldError>}
           </Field>
         </div>
       </fieldset>

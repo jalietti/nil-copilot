@@ -92,7 +92,7 @@ export type InterviewFormState = ReturnType<typeof useInterviewForm>
 export function InterviewStep3Fields({ form }: { form: InterviewFormState }) {
   return (
     <>
-      <Field label="What are you genuinely into?" hint="One per line or separated by commas, whatever's easier.">
+      <Field label="What are you genuinely into?" hint="One per line or separated by commas, whatever's easier." error={form.interestsError}>
         <textarea
           required
           rows={5}
@@ -101,7 +101,6 @@ export function InterviewStep3Fields({ form }: { form: InterviewFormState }) {
           placeholder={'sustainable outdoor gear\ntrail running\nbackpacking'}
           className={textareaClass}
         />
-        {form.interestsError && <FieldError>{form.interestsError}</FieldError>}
       </Field>
 
       <Field
