@@ -137,7 +137,7 @@ async function checkSupabase(ref: string) {
     const { error } = await admin.from(table as 'profiles').select(columns).limit(0)
     if (error) missing.push(`${table} (${error.message})`)
   }
-  pass('Database: all migrations applied (0001-0014)', missing.length === 0, `missing: ${missing.join('; ')} — run npm run pilot:db-push -- ${ref}`)
+  pass('Database: all migrations applied (0001-0015)', missing.length === 0, `missing: ${missing.join('; ')} — run npm run pilot:db-push -- ${ref}`)
 
   const anon = createClient<Database>(url, publishableKey, { auth: { persistSession: false } })
   const { error: anonError } = await anon.from('profiles').select('id').limit(1)
