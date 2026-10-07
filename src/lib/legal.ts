@@ -3,7 +3,7 @@
 // records which version the athlete agreed to.
 
 export const LEGAL_NAME = 'NIL Copilot'
-export const LEGAL_CONTACT_EMAIL = 'support@nilcopilot.team'
+export const LEGAL_CONTACT_EMAIL = 'nilcopilot.team@gmail.com'
 export const LEGAL_VERSION = '2026-10-06'
 export const LEGAL_UPDATED_LABEL = 'October 6, 2026'
 export const MINIMUM_AGE = 18
