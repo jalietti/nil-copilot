@@ -160,3 +160,26 @@ describe('anon', () => {
     )
   })
 })
+
+// Supabase advisor lint 0011: a function without a pinned search_path resolves
+// names through whatever path the caller set. 0014 pins the last one.
+describe('database functions', () => {
+  it('every public function pins its search_path', async () => {
+    const { rows } = await db.query<{ proname: string }>(
+      `select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public'
+          and not exists (select 1 from unnest(coalesce(p.proconfig, '{}')) c where c like 'search_path=%')`,
+    )
+    expect(rows).toEqual([])
+  })
+
+  it('set_updated_at still stamps updated_at on an athlete update', async () => {
+    await db.exec(`update profiles set updated_at = '2000-01-01' where id = '${A}'`)
+    await asA((tx) => tx.query(`update profiles set full_name = 'Alex' where id = $1`, [A]))
+    const { rows } = await db.query<{ stamped: boolean }>(
+      `select updated_at > now() - interval '1 minute' as stamped from profiles where id = $1`,
+      [A],
+    )
+    expect(rows).toEqual([{ stamped: true }])
+  })
+})
