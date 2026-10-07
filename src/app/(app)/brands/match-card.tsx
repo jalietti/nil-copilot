@@ -2,17 +2,28 @@
 
 import { useState, useTransition } from 'react'
 import type { Brand, BrandMatch } from '@/lib/supabase/types'
+import { Button, Field, FieldError, Monogram, cardClass, inputClass } from '@/components/ui'
+import { CheckIcon, ExternalIcon, InfoIcon } from '@/components/icons'
 import { addContactEmail, dismissMatch, startDeal } from './actions'
 
-const inputClass = 'rounded border border-neutral-300 px-2 py-1 text-sm'
+const SHIMMER = 'bg-[linear-gradient(90deg,var(--surface-2)_0%,var(--line-soft)_50%,var(--surface-2)_100%)] bg-[length:200%_100%] animate-shimmer'
 
-export function MatchCard({ match, brand }: { match: BrandMatch; brand: Brand }) {
+export function MatchCard({
+  match,
+  brand,
+  isNew,
+}: {
+  match: BrandMatch
+  brand: Brand
+  isNew: boolean
+}) {
   const [pending, startTransition] = useTransition()
   const [adding, setAdding] = useState(false)
   const [email, setEmail] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   const contactEmail = match.contact_email ?? brand.contact_email
+  const canOpenDeal = match.status === 'drafting' || match.status === 'contacted'
 
   function saveEmail(e: React.FormEvent) {
     e.preventDefault()
@@ -25,58 +36,89 @@ export function MatchCard({ match, brand }: { match: BrandMatch; brand: Brand })
   }
 
   return (
-    <li className="rounded border border-neutral-200 p-4">
-      <div className="mb-1 flex items-baseline justify-between">
-        <h2 className="font-medium">{brand.name}</h2>
-        <a
-          href={`https://${brand.domain}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs text-neutral-500 underline"
-        >
-          {brand.domain}
-        </a>
-      </div>
-      {match.search_focus && (
-        <p className="mb-1 text-xs text-neutral-500">From your search: {match.search_focus}</p>
-      )}
-      {brand.description && <p className="mb-2 text-sm text-neutral-600">{brand.description}</p>}
-      <p className="mb-3 text-sm">
-        <span className="font-medium">Why it fits: </span>
-        {match.fit_reason}
-      </p>
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          disabled={pending || !contactEmail}
-          onClick={() => startTransition(() => startDeal(match.id).then(() => undefined))}
-          className="rounded bg-black px-3 py-1.5 text-sm text-white disabled:opacity-50"
-        >
-          {match.status === 'drafting' || match.status === 'contacted'
-            ? 'Open deal'
-            : 'Draft outreach'}
-        </button>
-        {match.contact_email && (
-          <span className="text-xs text-neutral-500">Using {match.contact_email} (added by you)</span>
-        )}
-        {!contactEmail && !adding && (
-          <span className="text-xs text-neutral-500">
-            No contact email found yet ·{' '}
-            <button onClick={() => setAdding(true)} className="underline">
-              Know their email? Add it
-            </button>
+    <li className={`flex flex-col gap-3.5 p-5 ${cardClass}`}>
+      <div className="flex items-start gap-3">
+        <Monogram name={brand.name} />
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <h3 className="text-[17px] font-semibold text-ink">{brand.name}</h3>
+          <a
+            href={`https://${brand.domain}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="-my-3 inline-flex items-center gap-1 py-3 text-[13px] text-muted hover:text-ink"
+          >
+            {brand.domain}
+            <ExternalIcon size={14} />
+          </a>
+        </div>
+        {isNew && (
+          <span className="shrink-0 rounded-full bg-accent-soft px-2 py-1 text-[12px] font-bold tracking-wide text-accent-text uppercase">
+            New
           </span>
         )}
-        <button
+      </div>
+
+      {match.search_focus && (
+        <p className="text-[13px] text-muted">From your search: {match.search_focus}</p>
+      )}
+
+      {brand.description && (
+        <p className="text-[15px] leading-relaxed text-muted">{brand.description}</p>
+      )}
+
+      <div className="flex flex-col gap-1 rounded-[10px] bg-surface-2 p-3">
+        <span className="eyebrow text-[11px]">Why it fits you</span>
+        <span className="text-[15px] leading-snug text-ink">{match.fit_reason}</span>
+      </div>
+
+      <div className="flex-1" />
+
+      {contactEmail ? (
+        <span className="flex items-center gap-1.5 text-[13px] text-muted">
+          <CheckIcon size={16} className="shrink-0 text-agreed" />
+          {match.contact_email
+            ? `Using ${match.contact_email} (added by you)`
+            : `Contact: ${contactEmail}`}
+        </span>
+      ) : (
+        <span className="flex items-center gap-1.5 text-[13px] text-muted">
+          <InfoIcon size={16} className="shrink-0" />
+          No contact email found yet. Check their site footer or Instagram bio.
+        </span>
+      )}
+
+      <div className="flex gap-2">
+        {contactEmail ? (
+          <Button
+            variant="outline"
+            className="flex-1"
+            disabled={pending}
+            onClick={() => startTransition(() => startDeal(match.id).then(() => undefined))}
+          >
+            {canOpenDeal ? 'Open deal' : 'Draft outreach'}
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            className="flex-1"
+            disabled={pending}
+            onClick={() => setAdding(true)}
+          >
+            Add email to draft
+          </Button>
+        )}
+        <Button
+          variant="ghost"
           disabled={pending}
           onClick={() => startTransition(() => dismissMatch(match.id))}
-          className="text-sm text-neutral-500 underline"
         >
           Not for me
-        </button>
+        </Button>
       </div>
+
       {adding && (
-        <form onSubmit={saveEmail} className="mt-3 flex flex-col gap-1">
-          <div className="flex flex-wrap items-center gap-2">
+        <form onSubmit={saveEmail} className="flex flex-col gap-2">
+          <Field label="Contact email" hint="Only you see this.">
             <input
               type="email"
               required
@@ -86,24 +128,40 @@ export function MatchCard({ match, brand }: { match: BrandMatch; brand: Brand })
               onChange={(e) => setEmail(e.target.value)}
               className={inputClass}
             />
-            <button
-              type="submit"
-              disabled={pending}
-              className="rounded border border-neutral-300 px-3 py-1 text-sm disabled:opacity-50"
-            >
+          </Field>
+          {error && <FieldError>{error}</FieldError>}
+          <div className="flex gap-2">
+            <Button type="submit" variant="outline" disabled={pending}>
               {pending ? 'Checking…' : 'Save'}
-            </button>
-            <button type="button" onClick={() => setAdding(false)} className="text-xs underline">
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => setAdding(false)}>
               Cancel
-            </button>
+            </Button>
           </div>
-          <p className="text-xs text-neutral-500">
-            Only you see this. Check their website footer or Instagram bio for a partnerships or
-            hello@ address.
-          </p>
-          {error && <p className="text-xs text-red-600">{error}</p>}
         </form>
       )}
+    </li>
+  )
+}
+
+// Rendered while a run is in flight, appended after the real cards.
+export function MatchCardSkeleton() {
+  return (
+    <li
+      aria-hidden="true"
+      className="flex flex-col gap-3.5 rounded-[14px] border border-dashed border-line p-5"
+    >
+      <div className="flex items-center gap-3">
+        <span className={`size-10 shrink-0 rounded-[10px] ${SHIMMER}`} />
+        <div className="flex flex-1 flex-col gap-2">
+          <span className={`h-3.5 w-3/5 rounded ${SHIMMER}`} />
+          <span className={`h-2.5 w-2/5 rounded ${SHIMMER}`} />
+        </div>
+      </div>
+      <span className={`h-3 rounded ${SHIMMER}`} />
+      <span className={`h-3 w-4/5 rounded ${SHIMMER}`} />
+      <span className={`h-16 rounded-[10px] ${SHIMMER}`} />
+      <span className="text-[13px] text-muted">Arriving…</span>
     </li>
   )
 }

@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { ResendConfirmation } from '@/components/resend-confirmation'
+import { AuthShell } from '@/components/auth-shell'
+import { Field, Notice, inputClass } from '@/components/ui'
 
 export default function LoginPage() {
   return (
@@ -45,60 +47,53 @@ function LoginForm() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 p-6">
-      {deleted && (
-        <p className="rounded border border-neutral-200 bg-neutral-50 p-3 text-sm">
-          Your account and your data have been deleted.
-        </p>
-      )}
-      <h1 className="text-2xl font-semibold">Log in</h1>
+    <AuthShell title="Welcome back" subtitle="Log in to see what needs you today.">
+      {deleted && <Notice>Your account and your data have been deleted.</Notice>}
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <label className="flex flex-col gap-1 text-sm">
-          Email
+        <Field label="Email">
           <input
             type="email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="rounded border border-neutral-300 px-3 py-2"
+            className={inputClass}
           />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Password
+        </Field>
+        <Field label="Password">
           <input
             type="password"
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="rounded border border-neutral-300 px-3 py-2"
+            className={inputClass}
           />
-        </label>
-        <Link href="/forgot-password" className="-mt-2 self-end text-xs text-neutral-600 underline">
+        </Field>
+        <Link href="/forgot-password" className="-mt-2 self-end text-[13px] text-accent-text">
           Forgot password?
         </Link>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <Notice tone="error">{error}</Notice>}
         {!error && linkFailed && (
-          <p className="text-sm text-neutral-700">
+          <Notice>
             That email link couldn&apos;t sign you in — it may have expired, or been opened in a
             different browser than the one you signed up in. If you were confirming your email,
             it&apos;s probably confirmed already: try logging in. Otherwise, resend it below.
-          </p>
+          </Notice>
         )}
         {(needsConfirmation || linkFailed) && <ResendConfirmation email={email} />}
         <button
           type="submit"
           disabled={loading}
-          className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
+          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-[10px] border border-transparent bg-accent text-[15px] font-semibold text-accent-ink transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-subtle"
         >
           {loading ? 'Logging in…' : 'Log in'}
         </button>
       </form>
-      <p className="text-sm text-neutral-600">
+      <p className="text-sm text-muted">
         New here?{' '}
-        <Link href="/signup" className="underline">
+        <Link href="/signup" className="font-semibold text-accent-text">
           Create an account
         </Link>
       </p>
-    </main>
+    </AuthShell>
   )
 }

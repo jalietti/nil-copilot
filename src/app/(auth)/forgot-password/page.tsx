@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { AuthShell } from '@/components/auth-shell'
+import { Field, Notice, inputClass } from '@/components/ui'
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
@@ -30,50 +32,45 @@ export default function ForgotPasswordPage() {
 
   if (sent) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 p-6">
-        <h1 className="text-2xl font-semibold">Check your email</h1>
-        <p className="text-sm text-neutral-600">
-          If there&apos;s an account for <strong>{email}</strong>, we sent a link to reset your
-          password. It can take a few minutes to arrive.
+      <AuthShell title="Check your email">
+        <p className="text-[15px] leading-relaxed text-muted">
+          If there&apos;s an account for <strong className="text-ink">{email}</strong>, we sent a
+          link to reset your password. It can take a few minutes to arrive.
         </p>
-        <Link href="/login" className="text-sm underline">
+        <Link href="/login" className="text-sm font-semibold text-accent-text">
           Back to log in
         </Link>
-      </main>
+      </AuthShell>
     )
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 p-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Reset your password</h1>
-        <p className="mt-1 text-sm text-neutral-600">
-          Enter the email you signed up with and we&apos;ll send you a reset link.
-        </p>
-      </div>
+    <AuthShell
+      title="Reset your password"
+      subtitle="Enter the email you signed up with and we'll send you a reset link."
+    >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <label className="flex flex-col gap-1 text-sm">
-          Email
+        <Field label="Email">
           <input
             type="email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="rounded border border-neutral-300 px-3 py-2"
+            className={inputClass}
           />
-        </label>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        </Field>
+        {error && <Notice tone="error">{error}</Notice>}
         <button
           type="submit"
           disabled={loading}
-          className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
+          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-[10px] border border-transparent bg-accent text-[15px] font-semibold text-accent-ink transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-subtle"
         >
           {loading ? 'Sending…' : 'Send reset link'}
         </button>
       </form>
-      <Link href="/login" className="text-sm text-neutral-600 underline">
-        Back to log in
+      <Link href="/login" className="text-sm text-muted">
+        Back to <span className="font-semibold text-accent-text">log in</span>
       </Link>
-    </main>
+    </AuthShell>
   )
 }

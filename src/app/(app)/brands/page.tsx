@@ -1,12 +1,14 @@
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { DiscoveryControls } from './discovery-controls'
-import { MatchCard } from './match-card'
-import { SearchPreferences } from './search-preferences'
-import { FocusedSearch } from './focused-search'
+import { DiscoveryStatus } from './discovery-status'
+import { MatchCard, MatchCardSkeleton } from './match-card'
+import { TuneDrawer } from './tune-drawer'
 import { isRunInFlight } from '@/lib/discovery-guard'
+import { PageHeader, cardClass } from '@/components/ui'
 import type { Brand, BrandMatch } from '@/lib/supabase/types'
+
+const NEW_PILL_MS = 3 * 24 * 60 * 60 * 1000
 
 export default async function BrandsPage() {
   const supabase = await createClient()
@@ -29,60 +31,88 @@ export default async function BrandsPage() {
       .order('created_at', { ascending: false }),
     supabase
       .from('discovery_runs')
-      .select('status, brands_found, matches_created, created_at, kind, focus')
+      .select('status, brands_found, matches_created, created_at, finished_at, kind, focus')
       .eq('athlete_id', user.id)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
   ])
 
-  if (!interview) {
-    return (
-      <main>
-        <h1 className="mb-4 text-2xl font-semibold">Brand matches</h1>
-        <p className="text-sm text-neutral-600">
-          Do the{' '}
-          <Link href="/interview" className="underline">
-            interview
-          </Link>{' '}
-          first — that&apos;s how the copilot knows which brands to research for you.
-        </p>
-      </main>
-    )
-  }
+  if (!interview) redirect('/onboarding')
 
+  const now = new Date()
   const matchList = (matches ?? []) as (BrandMatch & { brands: Brand })[]
+  const inFlight = latestRun ? isRunInFlight(latestRun, now) : false
+  const newMatchesCount = latestRun
+    ? matchList.filter((m) => new Date(m.created_at).getTime() >= new Date(latestRun.created_at).getTime())
+        .length
+    : 0
+  const whatMatters = (
+    (interview.raw_answers as { what_matters?: string } | null)?.what_matters ?? ''
+  ).trim()
+  const basedOn = [...(interview.values ?? []), ...(interview.target_industries ?? [])]
+    .slice(0, 3)
+    .join(', ')
 
   return (
-    <main>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Brand matches</h1>
-        <DiscoveryControls
-          latestRun={latestRun}
-          inFlight={latestRun ? isRunInFlight(latestRun, new Date()) : false}
-        />
-      </div>
-      <SearchPreferences
-        values={interview.values}
-        industries={interview.target_industries}
-        fromInterview={!interview.values_customized}
-        whatMatters={
-          ((interview.raw_answers as { what_matters?: string } | null)?.what_matters ?? '').trim()
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Brand matches"
+        description="Researched live for you, never pulled from a fixed list. Pick one that fits and draft the outreach. You send it yourself."
+        actions={
+          <>
+            <TuneDrawer
+              values={interview.values}
+              industries={interview.target_industries}
+              fromInterview={!interview.values_customized}
+              whatMatters={whatMatters}
+              focusDisabled={inFlight}
+            />
+            <DiscoveryControls inFlight={inFlight} />
+          </>
         }
       />
-      <FocusedSearch disabled={latestRun ? isRunInFlight(latestRun, new Date()) : false} />
-      {matchList.length === 0 ? (
-        <p className="text-sm text-neutral-600">
-          No matches yet. Kick off discovery and the copilot will research brands that actually fit
-          your interests — live research, not a fixed list.
-        </p>
+
+      {/* DiscoveryControls portals its start-run error here, below the header. */}
+      <div id="discovery-error-slot" />
+
+      <DiscoveryStatus
+        latestRun={latestRun}
+        inFlight={inFlight}
+        newMatchesCount={newMatchesCount}
+        now={now}
+      />
+
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <h2 className="eyebrow">
+          {matchList.length} match{matchList.length === 1 ? '' : 'es'}
+        </h2>
+        {basedOn && <span className="text-sm text-muted">Based on: {basedOn}</span>}
+      </div>
+
+      {matchList.length === 0 && !inFlight ? (
+        <div className={`flex flex-col gap-2 p-6 ${cardClass}`}>
+          <p className="text-[15px] text-muted">
+            Your copilot is ready. Hit Find more brands and it researches the live web for brands
+            that fit you. It takes a few minutes, and you can leave while it works.
+          </p>
+        </div>
       ) : (
-        <ul className="flex flex-col gap-4">
-          {matchList.map((match) => (
-            <MatchCard key={match.id} match={match} brand={match.brands} />
-          ))}
+        <ul className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
+          {matchList.map((match) => {
+            const isNew =
+              match.status === 'suggested' &&
+              now.getTime() - new Date(match.created_at).getTime() < NEW_PILL_MS
+            return <MatchCard key={match.id} match={match} brand={match.brands} isNew={isNew} />
+          })}
+          {inFlight && (
+            <>
+              <MatchCardSkeleton />
+              <MatchCardSkeleton />
+            </>
+          )}
         </ul>
       )}
-    </main>
+    </div>
   )
 }

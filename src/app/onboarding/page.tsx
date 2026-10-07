@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { ProfileForm } from '@/components/profile-form'
+import { OnboardingWizard } from './onboarding-wizard'
 
 export default async function OnboardingPage() {
   const supabase = await createClient()
@@ -9,21 +9,46 @@ export default async function OnboardingPage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('onboarding_completed_at')
-    .eq('id', user.id)
-    .maybeSingle()
+  const [{ data: profile }, { data: interview }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select(
+        'onboarding_completed_at, full_name, school, sport, division, instagram_followers, tiktok_followers, other_followers, citizenship_status',
+      )
+      .eq('id', user.id)
+      .maybeSingle(),
+    supabase
+      .from('interviews')
+      .select('interests, brands_used, deal_preferences, raw_answers')
+      .eq('athlete_id', user.id)
+      .maybeSingle(),
+  ])
 
-  if (profile?.onboarding_completed_at) redirect('/dashboard')
+  if (profile?.onboarding_completed_at && interview) redirect('/dashboard')
+
+  const initialStep = profile?.onboarding_completed_at && !interview ? 3 : 1
+
+  const prefs = (interview?.deal_preferences ?? {}) as Partial<
+    Record<'low' | 'mid' | 'high', 'product_only' | 'discount_plus_product' | 'product_plus_payment' | 'payment_required'>
+  > & { notes?: string }
 
   return (
-    <main className="mx-auto max-w-lg p-6">
-      <h1 className="mb-1 text-2xl font-semibold">Tell us about you</h1>
-      <p className="mb-6 text-sm text-neutral-600">
-        This shapes which brands we research for you and how deals get drafted.
-      </p>
-      <ProfileForm userId={user.id} mode="onboarding" />
-    </main>
+    <OnboardingWizard
+      userId={user.id}
+      initialStep={initialStep}
+      profileInitial={profile ?? undefined}
+      interviewInitial={
+        interview
+          ? {
+              interests: interview.interests,
+              brands_used: interview.brands_used,
+              what_matters:
+                ((interview.raw_answers as Record<string, unknown> | null)?.what_matters as string) ??
+                '',
+              deal_preferences: prefs,
+            }
+          : undefined
+      }
+    />
   )
 }

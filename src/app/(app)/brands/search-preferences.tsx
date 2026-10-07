@@ -1,9 +1,8 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { Button, Field, FieldError, textareaClass } from '@/components/ui'
 import { saveSearchPreferences } from './actions'
-
-const inputClass = 'w-full rounded border border-neutral-300 px-3 py-2 text-sm'
 
 const toLines = (items: string[]) => items.join('\n')
 const fromLines = (text: string) =>
@@ -20,12 +19,12 @@ interface Props {
   whatMatters: string
 }
 
-function Chips({ items, empty }: { items: string[]; empty: string }) {
-  if (items.length === 0) return <span className="text-sm text-neutral-500">{empty}</span>
+function Pills({ items, empty }: { items: string[]; empty: string }) {
+  if (items.length === 0) return <span className="text-[14px] text-muted">{empty}</span>
   return (
     <ul className="flex flex-wrap gap-2">
       {items.map((item) => (
-        <li key={item} className="rounded-full bg-neutral-100 px-3 py-1 text-sm">
+        <li key={item} className="rounded-full bg-surface-2 px-3 py-1.5 text-[14px] text-ink">
           {item}
         </li>
       ))}
@@ -56,72 +55,69 @@ export function SearchPreferences({ values, industries, fromInterview, whatMatte
   }
 
   return (
-    <section className="mb-6 rounded border border-neutral-200 p-4">
-      <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="font-medium">What you&apos;re looking for</h2>
+    <section className="flex flex-col gap-4">
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="text-[15px] font-semibold text-ink">What you&apos;re looking for</h3>
         {!editing && (
-          <button onClick={() => setEditing(true)} className="text-sm underline">
+          <Button type="button" variant="ghost" onClick={() => setEditing(true)}>
             Edit
-          </button>
+          </Button>
         )}
       </div>
 
       {!editing ? (
-        <div className="flex flex-col gap-3">
-          <div>
-            <p className="mb-1 text-xs uppercase tracking-wide text-neutral-500">
-              Values brands should share{fromInterview && values.length > 0 ? ' (from your interview)' : ''}
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <p className="text-[12px] font-semibold tracking-wide text-subtle uppercase">
+              Values brands should share
+              {fromInterview && values.length > 0 ? ' (from your interview)' : ''}
             </p>
-            <Chips items={values} empty="None yet — add what matters to you in a brand." />
+            <Pills items={values} empty="None yet — add what matters to you in a brand." />
           </div>
-          <div>
-            <p className="mb-1 text-xs uppercase tracking-wide text-neutral-500">Industries to search</p>
-            <Chips items={industries} empty="None yet — add industries you'd like to work in." />
+          <div className="flex flex-col gap-1.5">
+            <p className="text-[12px] font-semibold tracking-wide text-subtle uppercase">
+              Industries to search
+            </p>
+            <Pills items={industries} empty="None yet — add industries you'd like to work in." />
           </div>
         </div>
       ) : (
-        <form onSubmit={save} className="flex flex-col gap-3">
+        <form onSubmit={save} className="flex flex-col gap-4">
           {whatMatters && (
-            <p className="rounded bg-neutral-50 p-2 text-xs text-neutral-600">
+            <p className="rounded-[10px] bg-surface-2 p-3 text-[13px] text-muted">
               In your interview you said: &ldquo;{whatMatters}&rdquo;
             </p>
           )}
-          <label className="flex flex-col gap-1 text-sm">
-            Values brands should share (one per line)
+          <Field label="Values brands should share (one per line)">
             <textarea
               rows={3}
               value={valuesText}
               onChange={(e) => setValuesText(e.target.value)}
               placeholder={'sustainability\nwomen-owned\nsmall independent brands'}
-              className={inputClass}
+              className={textareaClass}
             />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            Industries you&apos;d like to work in (one per line)
+          </Field>
+          <Field label="Industries you'd like to work in (one per line)">
             <textarea
               rows={3}
               value={industriesText}
               onChange={(e) => setIndustriesText(e.target.value)}
               placeholder={'specialty coffee\noutdoor gear\nskincare'}
-              className={inputClass}
+              className={textareaClass}
             />
-          </label>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <div className="flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={pending}
-              className="rounded bg-black px-3 py-1.5 text-sm text-white disabled:opacity-50"
-            >
+          </Field>
+          {error && <FieldError>{error}</FieldError>}
+          <div className="flex items-center gap-2">
+            <Button type="submit" variant="outline" disabled={pending}>
               {pending ? 'Saving…' : 'Save'}
-            </button>
-            <button type="button" onClick={() => setEditing(false)} className="text-sm underline">
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => setEditing(false)}>
               Cancel
-            </button>
+            </Button>
           </div>
         </form>
       )}
-      <p className="mt-3 text-xs text-neutral-500">
+      <p className="text-[13px] text-muted">
         Discovery researches your industries and favors brands that share your values, starting
         with your next run.
       </p>

@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { ResendConfirmation } from '@/components/resend-confirmation'
+import { AuthShell } from '@/components/auth-shell'
+import { Field, Notice, inputClass } from '@/components/ui'
 import { signUpWithInvite } from './actions'
 
 export default function SignupPage() {
@@ -28,74 +30,68 @@ export default function SignupPage() {
 
   if (sent) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 p-6">
-        <h1 className="text-2xl font-semibold">Check your email</h1>
-        <p className="text-sm text-neutral-600">
-          We sent a confirmation link to <strong>{email}</strong>. Click it to finish signing up.
+      <AuthShell title="Check your email">
+        <p className="text-[15px] leading-relaxed text-muted">
+          We sent a confirmation link to <strong className="text-ink">{email}</strong>. Click it
+          to finish signing up.
         </p>
-        <p className="text-sm text-neutral-600">
+        <p className="text-[15px] leading-relaxed text-muted">
           It can take a few minutes. Didn&apos;t get it, or the link didn&apos;t work?
         </p>
         <ResendConfirmation email={email} />
-      </main>
+      </AuthShell>
     )
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 p-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Create your account</h1>
-        <p className="mt-1 text-sm text-neutral-600">
-          NIL Copilot is invite-only while we pilot it. You&apos;ll need the code you were sent.
-        </p>
-      </div>
+    <AuthShell
+      title="Join the pilot"
+      subtitle="You'll need the invite code from whoever brought you in."
+    >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <label className="flex flex-col gap-1 text-sm">
-          Invite code
+        <Field label="Invite code">
           <input
             required
             autoComplete="off"
             value={inviteCode}
             onChange={(e) => setInviteCode(e.target.value)}
-            className="rounded border border-neutral-300 px-3 py-2 uppercase"
+            className={`${inputClass} uppercase`}
           />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Email
+        </Field>
+        <Field label="Email">
           <input
             type="email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="rounded border border-neutral-300 px-3 py-2"
+            className={inputClass}
           />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Password
+        </Field>
+        <Field label="Password">
           <input
             type="password"
             required
             minLength={8}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="rounded border border-neutral-300 px-3 py-2"
+            className={inputClass}
           />
-        </label>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        </Field>
+        {error && <Notice tone="error">{error}</Notice>}
         <button
           type="submit"
           disabled={loading}
-          className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
+          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-[10px] border border-transparent bg-accent text-[15px] font-semibold text-accent-ink transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-subtle"
         >
           {loading ? 'Creating…' : 'Sign up'}
         </button>
       </form>
-      <p className="text-sm text-neutral-600">
+      <p className="text-sm text-muted">
         Already have an account?{' '}
-        <Link href="/login" className="underline">
+        <Link href="/login" className="font-semibold text-accent-text">
           Log in
         </Link>
       </p>
-    </main>
+    </AuthShell>
   )
 }

@@ -7,30 +7,27 @@ import {
   type CompensationAsk,
   type ProductValueTier,
 } from '@/lib/deal-preferences'
+import { Field, FieldError, Notice, inputClass, textareaClass } from '@/components/ui'
+import { CheckIcon } from '@/components/icons'
+import { splitList } from '@/lib/split-list'
 import { submitInterview } from './actions'
-
-const inputClass = 'rounded border border-neutral-300 px-3 py-2'
 
 const TIERS: ProductValueTier[] = ['low', 'mid', 'high']
 const ASKS = Object.keys(COMPENSATION_ASK_LABELS) as CompensationAsk[]
 
-function parseLines(value: string): string[] {
-  return value
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
+const parseLines = splitList
+
+export interface InterviewInitial {
+  interests: string[]
+  brands_used: string[]
+  what_matters: string
+  deal_preferences: Partial<Record<ProductValueTier, CompensationAsk>> & { notes?: string }
 }
 
-interface Props {
-  initial?: {
-    interests: string[]
-    brands_used: string[]
-    what_matters: string
-    deal_preferences: Partial<Record<ProductValueTier, CompensationAsk>> & { notes?: string }
-  }
-}
-
-export function InterviewForm({ initial }: Props) {
+// Shared by onboarding (split across steps 3-4) and the Account page
+// (single page). The save logic — submitInterview, which redirects to
+// /brands — lives in exactly one place.
+export function useInterviewForm(initial?: InterviewInitial) {
   const [interests, setInterests] = useState(initial?.interests.join('\n') ?? '')
   const [brandsUsed, setBrandsUsed] = useState(initial?.brands_used.join('\n') ?? '')
   const [whatMatters, setWhatMatters] = useState(initial?.what_matters ?? '')
@@ -40,12 +37,23 @@ export function InterviewForm({ initial }: Props) {
     high: initial?.deal_preferences.high ?? 'payment_required',
   })
   const [notes, setNotes] = useState(initial?.deal_preferences.notes ?? '')
-  const [error, setError] = useState<string | null>(null)
+  const [interestsError, setInterestsError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
   const [pending, startTransition] = useTransition()
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
+  function validateStep3(): boolean {
+    if (parseLines(interests).length === 0) {
+      setInterestsError('Share at least one genuine interest')
+      return false
+    }
+    setInterestsError(null)
+    return true
+  }
+
+  function submit() {
+    setFormError(null)
+    setSaved(false)
     startTransition(async () => {
       const result = await submitInterview({
         interests: parseLines(interests),
@@ -53,64 +61,86 @@ export function InterviewForm({ initial }: Props) {
         what_matters: whatMatters,
         deal_preferences: { ...prefs, notes: notes.trim() === '' ? undefined : notes },
       })
-      if (result?.error) setError(result.error)
+      if (result?.error) setFormError(result.error)
+      else setSaved(true)
     })
   }
 
+  return {
+    interests,
+    setInterests,
+    brandsUsed,
+    setBrandsUsed,
+    whatMatters,
+    setWhatMatters,
+    prefs,
+    setPrefs,
+    notes,
+    setNotes,
+    interestsError,
+    formError,
+    saved,
+    pending,
+    validateStep3,
+    submit,
+  }
+}
+
+export type InterviewFormState = ReturnType<typeof useInterviewForm>
+
+// Step 3 ("What you're into").
+export function InterviewStep3Fields({ form }: { form: InterviewFormState }) {
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="font-medium">What are you genuinely into?</span>
-        <span className="text-neutral-500">
-          One per line — hobbies, gear you care about, causes. The more specific, the better the
-          brand matches.
-        </span>
+    <>
+      <Field label="What are you genuinely into?" hint="One per line or separated by commas, whatever's easier." error={form.interestsError}>
         <textarea
           required
-          rows={4}
-          value={interests}
-          onChange={(e) => setInterests(e.target.value)}
+          rows={5}
+          value={form.interests}
+          onChange={(e) => form.setInterests(e.target.value)}
           placeholder={'sustainable outdoor gear\ntrail running\nbackpacking'}
-          className={inputClass}
+          className={textareaClass}
         />
-      </label>
+      </Field>
 
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="font-medium">Brands or products you actually use and like</span>
-        <span className="text-neutral-500">One per line. Optional but powerful.</span>
+      <Field
+        label="Brands or products you actually use and like"
+        hint="Optional, but these make the strongest pitches."
+      >
         <textarea
           rows={3}
-          value={brandsUsed}
-          onChange={(e) => setBrandsUsed(e.target.value)}
-          className={inputClass}
+          value={form.brandsUsed}
+          onChange={(e) => form.setBrandsUsed(e.target.value)}
+          placeholder="e.g. the bars you eat before meets"
+          className={textareaClass}
         />
-      </label>
+      </Field>
+    </>
+  )
+}
 
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="font-medium">What matters to you in a partnership?</span>
+// Step 4 ("What a deal is worth to you").
+export function InterviewStep4Fields({ form }: { form: InterviewFormState }) {
+  return (
+    <>
+      <Field label="What matters to you in a partnership?">
         <textarea
           rows={3}
-          value={whatMatters}
-          onChange={(e) => setWhatMatters(e.target.value)}
+          value={form.whatMatters}
+          onChange={(e) => form.setWhatMatters(e.target.value)}
           placeholder="e.g. I'd rather work with small brands I believe in than chase the biggest check"
-          className={inputClass}
+          className={textareaClass}
         />
-      </label>
+      </Field>
 
       <fieldset className="flex flex-col gap-3">
-        <legend className="mb-1 text-sm font-medium">
-          What would make a deal worth it to you?
-        </legend>
-        <p className="text-sm text-neutral-500">
-          Your answers here drive what the copilot asks for when it drafts outreach and counters.
-        </p>
+        <legend className="mb-1 text-sm font-semibold text-ink">What would make it worth it?</legend>
         {TIERS.map((tier) => (
-          <label key={tier} className="flex flex-col gap-1 text-sm">
-            {PRODUCT_VALUE_TIER_LABELS[tier]}
+          <Field key={tier} label={PRODUCT_VALUE_TIER_LABELS[tier]}>
             <select
-              value={prefs[tier]}
+              value={form.prefs[tier]}
               onChange={(e) =>
-                setPrefs((p) => ({ ...p, [tier]: e.target.value as CompensationAsk }))
+                form.setPrefs((p) => ({ ...p, [tier]: e.target.value as CompensationAsk }))
               }
               className={inputClass}
             >
@@ -120,28 +150,68 @@ export function InterviewForm({ initial }: Props) {
                 </option>
               ))}
             </select>
-          </label>
+          </Field>
         ))}
-        <label className="flex flex-col gap-1 text-sm">
-          Anything else about compensation? (optional)
-          <input value={notes} onChange={(e) => setNotes(e.target.value)} className={inputClass} />
-        </label>
+        <Field label="Anything else about compensation? (optional)">
+          <input
+            value={form.notes}
+            onChange={(e) => form.setNotes(e.target.value)}
+            className={inputClass}
+          />
+        </Field>
       </fieldset>
 
-      <p className="rounded border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700">
-        <span className="font-medium">How your answers are used:</span> they decide which brands
-        the copilot researches for you, and it also uses them to learn how you talk — so the emails
-        it drafts for you sound like you, not a template. Other athletes never see them.
+      <p className="rounded-xl bg-surface-2 p-3.5 text-[13px] leading-relaxed text-muted">
+        <span className="font-semibold text-ink">How your answers are used:</span> they decide which
+        brands the copilot researches for you, and it also uses them to learn how you talk — so the
+        emails it drafts for you sound like you, not a template. Other athletes never see them.
       </p>
+    </>
+  )
+}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
-      >
-        {pending ? 'Saving…' : 'Save and find brands'}
-      </button>
+function SavedLine() {
+  return (
+    <p className="flex items-center gap-1.5 text-[13px] font-medium text-agreed">
+      <CheckIcon size={16} className="shrink-0" />
+      Saved
+    </p>
+  )
+}
+
+// Single-page edit mode used on the Account page.
+export function InterviewForm({
+  initial,
+  submitLabel = 'Save and find brands',
+}: {
+  initial?: InterviewInitial
+  submitLabel?: string
+}) {
+  const form = useInterviewForm(initial)
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!form.validateStep3()) return
+    form.submit()
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+      <InterviewStep3Fields form={form} />
+      <InterviewStep4Fields form={form} />
+
+      {form.formError && <Notice tone="error">{form.formError}</Notice>}
+
+      <div className="flex items-center gap-4">
+        <button
+          type="submit"
+          disabled={form.pending}
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-[10px] border border-transparent bg-accent px-[18px] text-[15px] font-semibold text-accent-ink transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-subtle"
+        >
+          {form.pending ? 'Saving…' : submitLabel}
+        </button>
+        {form.saved && <SavedLine />}
+      </div>
     </form>
   )
 }
