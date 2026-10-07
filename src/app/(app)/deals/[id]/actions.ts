@@ -12,6 +12,14 @@ import { needsFollowUp, nextDealStatus } from '@/lib/deal-follow-up'
 import { reportError } from '@/lib/observability/sentry'
 import { withUsageContext } from '@/lib/usage'
 import { checkDailyAllowance } from '@/lib/usage-guard'
+import { saveFailed } from '@/lib/action-errors'
+import {
+  brandReplySchema,
+  dealOutcomeSchema,
+  draftEditSchema,
+  draftKindSchema,
+  isRecordId,
+} from '@/lib/validators/action-inputs'
 import type { Brand, Deal, DealStatus, Interview, Message, Profile } from '@/lib/supabase/types'
 
 class DailyDraftLimitReached extends Error {}
@@ -60,7 +68,10 @@ interface DealContext {
   fitReason: string
 }
 
+const DEAL_NOT_FOUND = 'Deal not found'
+
 async function loadDealContext(dealId: string): Promise<DealContext | { error: string }> {
+  if (!isRecordId(dealId)) return { error: DEAL_NOT_FOUND }
   const { supabase, user } = await requireUser()
 
   const { data: deal } = await supabase
@@ -68,7 +79,7 @@ async function loadDealContext(dealId: string): Promise<DealContext | { error: s
     .select('id, brand_id, athlete_id, status, sent_at, updated_at')
     .eq('id', dealId)
     .maybeSingle()
-  if (!deal) return { error: 'Deal not found' }
+  if (!deal) return { error: DEAL_NOT_FOUND }
 
   const [{ data: brand }, { data: profile }, { data: interview }, { data: messages }, { data: match }] =
     await Promise.all([
@@ -129,7 +140,7 @@ export async function generateOutreachDraft(dealId: string): Promise<{ error?: s
     subject: draft.subject,
     content: draft.body,
   })
-  if (error) return { error: error.message }
+  if (error) return { error: saveFailed(error, 'generateOutreachDraft') }
   after(() =>
     track('outreach_draft_generated', ctx.athleteId, {
       deal_id: dealId,
@@ -169,7 +180,7 @@ export async function generateCounterDraft(dealId: string): Promise<{ error?: st
     subject: draft.subject,
     content: draft.body,
   })
-  if (error) return { error: error.message }
+  if (error) return { error: saveFailed(error, 'generateCounterDraft') }
   const status = nextDealStatus(ctx.dealStatus, 'counter_drafted')
   await supabase.from('deals').update({ status }).eq('id', dealId)
   after(() =>
@@ -189,8 +200,9 @@ export async function saveDraftEdits(
   subject: string,
   content: string,
 ): Promise<{ error?: string }> {
-  if (content.trim().length === 0) return { error: 'The email body is empty' }
-  if (subject.length > 200 || content.length > 8000) return { error: 'That draft is too long' }
+  if (!isRecordId(messageId) || !isRecordId(dealId)) return { error: 'Draft not found' }
+  const parsed = draftEditSchema.safeParse({ subject, content })
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Check the draft' }
 
   const supabase = await createClient()
   const { data: message } = await supabase
@@ -201,10 +213,10 @@ export async function saveDraftEdits(
     .maybeSingle()
   if (!message || message.direction !== 'outbound_draft') return { error: 'Draft not found' }
 
-  const update = draftEditUpdate(message, { subject, content })
+  const update = draftEditUpdate(message, parsed.data)
   if (!update) return {}
   const { error } = await supabase.from('messages').update(update).eq('id', messageId)
-  if (error) return { error: error.message }
+  if (error) return { error: saveFailed(error, 'saveDraftEdits') }
   revalidatePath(`/deals/${dealId}`)
   return {}
 }
@@ -212,6 +224,7 @@ export async function saveDraftEdits(
 // The athlete confirms they clicked send in their own email client. The app
 // never sends anything itself — this only records what already happened.
 export async function markSent(dealId: string): Promise<{ error?: string }> {
+  if (!isRecordId(dealId)) return { error: DEAL_NOT_FOUND }
   const { supabase, user } = await requireUser()
 
   const { data: deal } = await supabase
@@ -219,7 +232,7 @@ export async function markSent(dealId: string): Promise<{ error?: string }> {
     .select('brand_id, status')
     .eq('id', dealId)
     .maybeSingle()
-  if (!deal) return { error: 'Deal not found' }
+  if (!deal) return { error: DEAL_NOT_FOUND }
 
   const newStatus = nextDealStatus(deal.status, 'marked_sent')
   // Starts (or, after a follow-up, restarts) the "did you hear back?" clock.
@@ -228,7 +241,7 @@ export async function markSent(dealId: string): Promise<{ error?: string }> {
     .from('deals')
     .update({ status: newStatus, ...sentAt })
     .eq('id', dealId)
-  if (error) return { error: error.message }
+  if (error) return { error: saveFailed(error, 'markSent') }
 
   await supabase
     .from('brand_matches')
@@ -244,20 +257,21 @@ export async function saveBrandReply(
   dealId: string,
   content: string,
 ): Promise<{ error?: string }> {
-  const trimmed = content.trim()
-  if (trimmed.length === 0) return { error: 'Paste the brand’s reply first' }
-  if (trimmed.length > 20_000) return { error: 'That reply is too long' }
+  if (!isRecordId(dealId)) return { error: DEAL_NOT_FOUND }
+  const parsed = brandReplySchema.safeParse(content)
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Check the reply' }
+  const trimmed = parsed.data
 
   const { supabase, user } = await requireUser()
   const { data: deal } = await supabase.from('deals').select('status').eq('id', dealId).maybeSingle()
-  if (!deal) return { error: 'Deal not found' }
+  if (!deal) return { error: DEAL_NOT_FOUND }
 
   const { error } = await supabase.from('messages').insert({
     deal_id: dealId,
     direction: 'inbound_pasted',
     content: trimmed,
   })
-  if (error) return { error: error.message }
+  if (error) return { error: saveFailed(error, 'saveBrandReply') }
   const status = nextDealStatus(deal.status, 'reply_pasted')
   await supabase.from('deals').update({ status }).eq('id', dealId)
   after(() => track('reply_pasted', user.id, { deal_id: dealId }))
@@ -270,13 +284,15 @@ export async function setDealStatus(
   dealId: string,
   status: 'agreed' | 'closed' | 'dead',
 ): Promise<{ error?: string }> {
+  if (!isRecordId(dealId)) return { error: DEAL_NOT_FOUND }
+  if (!dealOutcomeSchema.safeParse(status).success) return { error: 'Unknown deal status' }
   const { supabase, user } = await requireUser()
   const { data: deal } = await supabase.from('deals').select('status').eq('id', dealId).maybeSingle()
-  if (!deal) return { error: 'Deal not found' }
+  if (!deal) return { error: DEAL_NOT_FOUND }
 
   const newStatus = nextDealStatus(deal.status, status)
   const { error } = await supabase.from('deals').update({ status: newStatus }).eq('id', dealId)
-  if (error) return { error: error.message }
+  if (error) return { error: saveFailed(error, 'setDealStatus') }
   trackStatusChange(user.id, dealId, deal.status, newStatus)
   revalidatePath(`/deals/${dealId}`)
   revalidatePath('/dashboard')
@@ -313,7 +329,7 @@ export async function generateFollowUpDraft(dealId: string): Promise<{ error?: s
     subject: draft.subject,
     content: draft.body,
   })
-  if (error) return { error: error.message }
+  if (error) return { error: saveFailed(error, 'generateFollowUpDraft') }
   after(() =>
     track('follow_up_draft_generated', ctx.athleteId, {
       deal_id: dealId,
@@ -330,6 +346,7 @@ export async function recordMailtoClick(
   dealId: string,
   kind: DraftKind,
 ): Promise<void> {
+  if (!isRecordId(dealId) || !draftKindSchema.safeParse(kind).success) return
   const { supabase, user } = await requireUser()
   const { data: deal } = await supabase.from('deals').select('id').eq('id', dealId).maybeSingle()
   if (!deal) return
@@ -373,7 +390,7 @@ export async function regenerateDraft(dealId: string, messageId: string): Promis
     .from('messages')
     .update(regeneratedDraftUpdate(current, { subject: draft.subject, content: draft.body }, new Date()))
     .eq('id', messageId)
-  if (error) return { error: error.message }
+  if (error) return { error: saveFailed(error, 'regenerateDraft') }
   after(() => track('draft_regenerated', ctx.athleteId, { deal_id: dealId, kind }))
   revalidatePath(`/deals/${dealId}`)
   return {}

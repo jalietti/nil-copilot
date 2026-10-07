@@ -10,6 +10,7 @@ import { withUsageContext } from '@/lib/usage'
 import { checkDailyAllowance } from '@/lib/usage-guard'
 import { track } from '@/lib/analytics'
 import { reportError } from '@/lib/observability/sentry'
+import { saveFailed } from '@/lib/action-errors'
 
 export interface InterviewActionResult {
   error?: string
@@ -77,7 +78,7 @@ export async function submitInterview(raw: unknown): Promise<InterviewActionResu
     ? await supabase.from('interviews').update({ ...row, ...values }).eq('id', existing.id)
     : await supabase.from('interviews').insert({ athlete_id: user.id, ...row, ...values })
 
-  if (error) return { error: error.message }
+  if (error) return { error: saveFailed(error, 'submitInterview') }
   const athleteId = user.id
   after(() => track('interview_completed', athleteId, {
       first_time: !existing,
