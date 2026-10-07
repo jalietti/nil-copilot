@@ -40,7 +40,9 @@ async function checkApp(appUrl: string, supabaseUrl: string) {
   pass('Header strict-transport-security', !!login.headers.get('strict-transport-security'), 'missing')
 
   const signup = await (await fetch(`${appUrl}/signup`)).text()
-  pass('Signup is invite-only', signup.includes('invite-only'), 'signup page lacks the invite code field')
+  // Looks for the field's label, not marketing copy, so rewording the page
+  // can't break the check. The code itself is enforced in the auth.users trigger.
+  pass('Signup is invite-only', signup.includes('Invite code'), 'signup page lacks the invite code field')
 
   const dashboard = await fetch(`${appUrl}/dashboard`, { redirect: 'manual' })
   pass(
@@ -74,10 +76,13 @@ async function checkApp(appUrl: string, supabaseUrl: string) {
 // (nil-copilot-<id>-<team>.vercel.app), not the production domain. If Vercel
 // Deployment Protection puts a login in front of those, Inngest can't run
 // jobs: discovery runs sit "queued" forever with no error anywhere.
+// Production deployments only: previews are expected to sit behind Vercel
+// Authentication, so testing whichever deployment is newest (often a PR
+// preview) would report a login wall that production doesn't have.
 async function checkDeploymentReachable() {
   let listing: string
   try {
-    listing = execFileSync('npx', ['-y', 'vercel@latest', 'ls', 'nil-copilot'], {
+    listing = execFileSync('npx', ['-y', 'vercel@latest', 'ls', 'nil-copilot', '--environment', 'production'], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     })
