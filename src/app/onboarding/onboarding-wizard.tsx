@@ -76,7 +76,7 @@ export function OnboardingWizard({
     <div className="flex min-h-screen flex-col">
       <header className="flex items-center justify-between gap-4 px-6 py-5 sm:px-8">
         <Logo />
-        <span className="text-sm text-muted">Takes about 4 minutes</span>
+        <span className="text-sm text-muted">Takes a few minutes</span>
       </header>
 
       <main className="flex flex-1 justify-center px-5 pb-16">

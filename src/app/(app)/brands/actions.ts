@@ -11,6 +11,8 @@ import { track } from '@/lib/analytics'
 import { reportError } from '@/lib/observability/sentry'
 import { hasValidMx, isUsableAthleteEmail } from '@/lib/contact-email'
 import { searchPreferencesSchema } from '@/lib/validators/interview'
+import { contactEmailInputSchema, isRecordId } from '@/lib/validators/action-inputs'
+import { saveFailed } from '@/lib/action-errors'
 import { z } from 'zod'
 import type { DiscoveryRunKind } from '@/lib/supabase/types'
 import {
@@ -64,7 +66,7 @@ async function startRun(kind: DiscoveryRunKind, focus: string | null): Promise<S
     .select('id, status, created_at, kind')
     .eq('athlete_id', user.id)
     .or(`status.in.(queued,running),created_at.gte.${dailyWindowStart(now)}`)
-  if (runsError) return { ok: false, reason: 'error', message: runsError.message }
+  if (runsError) return { ok: false, reason: 'error', message: saveFailed(runsError, 'startDiscovery') }
 
   const guard = evaluateDiscoveryGuard(runs ?? [], now, kind)
   if (!guard.allowed) {
@@ -91,7 +93,7 @@ async function startRun(kind: DiscoveryRunKind, focus: string | null): Promise<S
     if (error.code === '23505') {
       return { ok: false, reason: 'in_progress', message: DISCOVERY_BLOCK_MESSAGES.in_progress }
     }
-    return { ok: false, reason: 'error', message: error.message }
+    return { ok: false, reason: 'error', message: saveFailed(error, 'startDiscovery') }
   }
 
   try {
@@ -114,7 +116,10 @@ async function startRun(kind: DiscoveryRunKind, focus: string | null): Promise<S
   return { ok: true }
 }
 
+const MATCH_NOT_FOUND = 'Match not found'
+
 export async function dismissMatch(matchId: string): Promise<void> {
+  if (!isRecordId(matchId)) return
   const supabase = await createClient()
   const {
     data: { user },
@@ -134,6 +139,7 @@ export async function dismissMatch(matchId: string): Promise<void> {
 }
 
 export async function startDeal(matchId: string): Promise<{ error?: string }> {
+  if (!isRecordId(matchId)) return { error: MATCH_NOT_FOUND }
   const supabase = await createClient()
   const {
     data: { user },
@@ -145,7 +151,7 @@ export async function startDeal(matchId: string): Promise<{ error?: string }> {
     .select('brand_id')
     .eq('id', matchId)
     .single()
-  if (!match) return { error: 'Match not found' }
+  if (!match) return { error: MATCH_NOT_FOUND }
 
   const { data: existing } = await supabase
     .from('deals')
@@ -161,7 +167,7 @@ export async function startDeal(matchId: string): Promise<{ error?: string }> {
       .insert({ athlete_id: user.id, brand_id: match.brand_id })
       .select('id')
       .single()
-    if (error) return { error: error.message }
+    if (error) return { error: saveFailed(error, 'startDeal') }
     dealId = deal.id
     await supabase.from('brand_matches').update({ status: 'drafting' }).eq('id', matchId)
     const newDealId = deal.id
@@ -180,13 +186,15 @@ export async function addContactEmail(
   matchId: string,
   rawEmail: string,
 ): Promise<{ error?: string }> {
+  if (!isRecordId(matchId)) return { error: MATCH_NOT_FOUND }
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const email = rawEmail.trim().toLowerCase()
+  const parsed = contactEmailInputSchema.safeParse(rawEmail)
+  const email = parsed.success ? parsed.data : ''
   if (!isUsableAthleteEmail(email)) return { error: 'That doesn’t look like a usable email address' }
   if (!(await hasValidMx(email, resolveMx))) {
     return { error: `${email.split('@')[1]} can’t receive email — double-check the address` }
@@ -198,8 +206,8 @@ export async function addContactEmail(
     .eq('id', matchId)
     .select('brand_id')
     .maybeSingle()
-  if (error) return { error: error.message }
-  if (!match) return { error: 'Match not found' }
+  if (error) return { error: saveFailed(error, 'addContactEmail') }
+  if (!match) return { error: MATCH_NOT_FOUND }
 
   after(() => track('contact_email_added', user.id, { match_id: matchId, brand_id: match.brand_id }))
   revalidatePath('/brands')
@@ -229,7 +237,7 @@ export async function saveSearchPreferences(raw: unknown): Promise<{ error?: str
     .eq('athlete_id', user.id)
     .select('id')
     .maybeSingle()
-  if (error) return { error: error.message }
+  if (error) return { error: saveFailed(error, 'saveSearchPreferences') }
   if (!data) return { error: 'Do the interview first' }
 
   after(() =>

@@ -5,12 +5,14 @@ import Link from 'next/link'
 import { ResendConfirmation } from '@/components/resend-confirmation'
 import { AuthShell } from '@/components/auth-shell'
 import { Field, Notice, inputClass } from '@/components/ui'
+import { MINIMUM_AGE } from '@/lib/legal'
 import { signUpWithInvite } from './actions'
 
 export default function SignupPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [inviteCode, setInviteCode] = useState('')
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
@@ -19,7 +21,7 @@ export default function SignupPage() {
     e.preventDefault()
     setLoading(true)
     setError(null)
-    const { error } = await signUpWithInvite({ email, password, inviteCode })
+    const { error } = await signUpWithInvite({ email, password, inviteCode, acceptedTerms })
     if (error) {
       setError(error)
       setLoading(false)
@@ -77,6 +79,26 @@ export default function SignupPage() {
             className={inputClass}
           />
         </Field>
+        <label className="flex items-start gap-3 text-sm leading-relaxed text-muted">
+          <input
+            type="checkbox"
+            required
+            checked={acceptedTerms}
+            onChange={(e) => setAcceptedTerms(e.target.checked)}
+            className="mt-0.5 size-4 shrink-0 accent-accent"
+          />
+          <span>
+            I’m {MINIMUM_AGE} or older and agree to the{' '}
+            <Link href="/terms" target="_blank" className="font-semibold text-accent-text">
+              Terms
+            </Link>{' '}
+            and{' '}
+            <Link href="/privacy" target="_blank" className="font-semibold text-accent-text">
+              Privacy Policy
+            </Link>
+            .
+          </span>
+        </label>
         {error && <Notice tone="error">{error}</Notice>}
         <button
           type="submit"

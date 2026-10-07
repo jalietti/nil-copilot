@@ -21,9 +21,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
       <AppSidebar name={profile?.full_name ?? ''} matchesToReview={matchesToReview ?? 0} />
-      <div className="min-w-0 grow px-5 pt-8 pb-16 sm:px-8 lg:px-12 lg:pt-10">
+      <main className="min-w-0 grow px-5 pt-8 pb-16 sm:px-8 lg:px-12 lg:pt-10">
         <div className="mx-auto max-w-[1120px]">{children}</div>
-      </div>
+      </main>
     </div>
   )
 }

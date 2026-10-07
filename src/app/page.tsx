@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Logo, buttonClass, cardClass } from '@/components/ui'
 import { MailIcon, LockIcon, GlobeIcon } from '@/components/icons'
+import { LegalLinks } from '@/components/legal-page'
 
 export default function Home() {
   return (
@@ -38,7 +39,7 @@ export default function Home() {
                 Log in
               </Link>
             </div>
-            <span className="text-sm text-muted">Setup takes about 4 minutes.</span>
+            <span className="text-sm text-muted">Setup takes a few minutes.</span>
           </div>
 
           <div
@@ -77,6 +78,7 @@ export default function Home() {
                 Open in my email
               </span>
             </div>
+            <p className="ml-10 text-xs text-muted">Illustration, not a real brand or match.</p>
           </div>
         </section>
 
@@ -89,7 +91,7 @@ export default function Home() {
               <span className="display text-[56px] text-accent-text">01</span>
               <h3 className="text-xl font-semibold">Tell us who you are</h3>
               <p className="leading-relaxed text-muted">
-                A 4-minute interview: your sport, what you&apos;re into, and what a deal is worth
+                A short interview: your sport, what you&apos;re into, and what a deal is worth
                 to you.
               </p>
             </li>
@@ -146,7 +148,7 @@ export default function Home() {
               <li className="flex gap-3.5">
                 <GlobeIcon size={24} className="mt-0.5 shrink-0" />
                 <span className="flex flex-col gap-1">
-                  <strong className="text-lg">International athletes, covered up front</strong>
+                  <strong className="text-lg">Visa guidance for international athletes</strong>
                   <span className="leading-relaxed text-band-muted">
                     Visa guidance before your first pitch, and a reminder to check with your DSO
                     before you agree to anything.
@@ -162,7 +164,7 @@ export default function Home() {
             Your next deal starts with one email.
           </h2>
           <p className="text-lg text-muted">
-            Setup takes about 4 minutes. Then one click starts your first brand search.
+            Setup takes a few minutes. Then one click starts your first brand search.
           </p>
           <Link href="/signup" className={buttonClass({ variant: 'primary', size: 'lg' })}>
             Get started
@@ -174,6 +176,7 @@ export default function Home() {
         <div className="mx-auto flex max-w-[1200px] flex-wrap justify-between gap-3 px-5 py-6 text-sm text-muted sm:px-8">
           <span>Made by a Bronco.</span>
           <span>NIL Copilot gives general information, not legal or tax advice.</span>
+          <LegalLinks />
         </div>
       </footer>
     </div>

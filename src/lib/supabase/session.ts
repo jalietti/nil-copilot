@@ -54,7 +54,10 @@ export async function updateSession(
   // the background-job endpoint unreachable from Inngest's servers.
   const isApiRoute = pathname.startsWith('/api')
 
-  if (!user && !isAuthRoute && !isApiRoute && pathname !== '/') {
+  // The legal pages must be readable before anyone signs up.
+  const isPublicPage = pathname === '/' || pathname === '/privacy' || pathname === '/terms'
+
+  if (!user && !isAuthRoute && !isApiRoute && !isPublicPage) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)

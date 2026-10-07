@@ -7,8 +7,10 @@ import { interviewSchema } from '@/lib/validators/interview'
 import { fallbackTags, normalizeInterview } from '@/lib/normalize-interview'
 import { generateVoiceProfile } from '@/lib/voice-profile'
 import { withUsageContext } from '@/lib/usage'
+import { checkDailyAllowance } from '@/lib/usage-guard'
 import { track } from '@/lib/analytics'
 import { reportError } from '@/lib/observability/sentry'
+import { saveFailed } from '@/lib/action-errors'
 
 export interface InterviewActionResult {
   error?: string
@@ -25,6 +27,10 @@ export async function submitInterview(raw: unknown): Promise<InterviewActionResu
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Please check your answers' }
   }
+
+  // Checked before any call; the answers stay in the form, so nothing is lost.
+  const blocked = await checkDailyAllowance('interview', user.id)
+  if (blocked) return { error: blocked }
 
   // Independent Claude calls; either failing must not lose the answers.
   const [tagsResult, voiceResult] = await withUsageContext(
@@ -72,7 +78,7 @@ export async function submitInterview(raw: unknown): Promise<InterviewActionResu
     ? await supabase.from('interviews').update({ ...row, ...values }).eq('id', existing.id)
     : await supabase.from('interviews').insert({ athlete_id: user.id, ...row, ...values })
 
-  if (error) return { error: error.message }
+  if (error) return { error: saveFailed(error, 'submitInterview') }
   const athleteId = user.id
   after(() => track('interview_completed', athleteId, {
       first_time: !existing,

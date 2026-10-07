@@ -49,6 +49,7 @@ test('new athlete: invite-gated signup, confirmation, visa step, interview with 
   await page.getByLabel('Invite code').fill('NOT-A-CODE')
   await page.getByLabel('Email').fill(email)
   await page.getByLabel('Password').fill('e2e-password-123')
+  await page.getByRole('checkbox', { name: /agree to the Terms/ }).check()
   await page.getByRole('button', { name: 'Sign up' }).click()
   await expect(page.getByText("That invite code isn't valid")).toBeVisible()
 
