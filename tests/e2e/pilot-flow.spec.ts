@@ -154,6 +154,11 @@ test('seeded athlete: follow-up prompt, draft, regenerate, edit, reply, counter,
   await page.getByRole('button', { name: 'I sent it' }).click()
   await expect(page.getByRole('heading', { name: 'Sent. Nice work.' })).toBeVisible()
   await expect(page.getByText('Waiting', { exact: true })).toBeVisible()
+  // After a reload the sent draft is history, not an editable draft.
+  await page.reload()
+  await expect(page.getByRole('heading', { name: /^Sent\. Waiting on / })).toBeVisible()
+  await expect(page.getByLabel('Body')).toHaveCount(0)
+  await expect(page.getByText(/^Sent [A-Z][a-z]{2} \d+$/)).toBeVisible()
   await page.locator('#reply textarea').fill('Hi Maya, we can send a mask and fins for two posts.')
   await page.getByRole('button', { name: 'Save reply' }).click()
   // The sent moment clears once a newer message lands.
@@ -162,6 +167,14 @@ test('seeded athlete: follow-up prompt, draft, regenerate, edit, reply, counter,
   await page.getByRole('button', { name: 'Draft my reply' }).click()
   await expect(page.getByLabel('Body')).toHaveValue(/E2E COUNTER DRAFT/)
   await expect(page.getByText('Negotiating', { exact: true })).toBeVisible()
+  // A counter sent mid-negotiation (status stays negotiating) also leaves
+  // the editor for good — the original bug.
+  await page.getByRole('button', { name: 'I sent it' }).click()
+  await expect(page.getByRole('heading', { name: 'Sent. Nice work.' })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('heading', { name: /^Sent\. Waiting on / })).toBeVisible()
+  await expect(page.getByLabel('Body')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'I sent it' })).toHaveCount(0)
   // Maya is on an F-1 visa: once a deal is live, the DSO reminder shows.
   await expect(page.getByText('Visa check')).toBeVisible()
   await expect(page.getByText(/check it with your Designated School Official/)).toBeVisible()

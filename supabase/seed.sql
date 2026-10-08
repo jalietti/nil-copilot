@@ -135,3 +135,17 @@ update public.deals set status = 'agreed' where id = 'd0000000-0000-4000-8000-00
 update public.deals set status = 'reply_received' where id = 'd0000000-0000-4000-8000-000000000003';
 update public.deals set status = 'negotiating' where id = 'd0000000-0000-4000-8000-000000000004';
 update public.deals set status = 'dead' where id = 'd0000000-0000-4000-8000-000000000006';
+
+-- "I sent it" clicks: every draft the brand replied to, and the outreach
+-- waiting on Tidewater. Kelp & Co's edited counter is still unsent — the
+-- athlete's move.
+update public.messages m
+   set sent_at = m.created_at + interval '1 hour'
+ where m.direction = 'outbound_draft'
+   and (
+     m.deal_id = 'd0000000-0000-4000-8000-000000000002'
+     or exists (
+       select 1 from public.messages r
+        where r.deal_id = m.deal_id and r.direction = 'inbound_pasted' and r.created_at > m.created_at
+     )
+   );

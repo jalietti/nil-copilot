@@ -4,6 +4,7 @@ import { Fragment, useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { buildMailtoUrl } from '@/lib/mailto'
 import { draftKind, type DraftKind } from '@/lib/draft-kind'
+import { activeDraft as liveDraft, isSent } from '@/lib/deal-thread'
 import { dealProgress, type DealStepState } from '@/lib/deal-stage'
 import { FOLLOW_UP_AFTER_MS } from '@/lib/deal-follow-up'
 import type { DealStatus, Message } from '@/lib/supabase/types'
@@ -64,7 +65,10 @@ export function DealThread({
 
   const last = messages.at(-1)
   const justSent = sentDraftId !== null && sentDraftId === last?.id
-  const activeDraft = last?.direction === 'outbound_draft' ? last : null
+  // A draft the athlete confirmed sending is history: it moves to the
+  // Conversation and the editor stops offering it (this survives a reload).
+  const activeDraft = liveDraft(messages)
+  const lastSent = last !== undefined && isSent(last)
   const priorMessages = activeDraft ? messages.slice(0, -1) : messages
 
   function run(action: () => Promise<ActionResult>) {
@@ -172,7 +176,7 @@ export function DealThread({
           className={`flex min-w-0 flex-[1.5_1_460px] flex-col gap-4 rounded-2xl p-[22px] ${cardClass}`}
         >
           {justSent ? (
-            <SentMoment followUpClock={dealStatus === 'sent'} />
+            <SentMoment brandName={brandName} followUpClock={dealStatus === 'sent'} celebrate />
           ) : activeDraft ? (
             <DraftEditor
               key={`${activeDraft.id}:${activeDraft.previous_versions.length}`}
@@ -197,6 +201,8 @@ export function DealThread({
                 See your brand matches
               </ButtonLink>
             </div>
+          ) : lastSent && !['agreed', 'closed'].includes(dealStatus) ? (
+            <SentMoment brandName={brandName} followUpClock={dealStatus === 'sent'} celebrate={false} />
           ) : messages.length === 0 ? (
             <div className="flex flex-col items-center gap-4 py-10 text-center">
               <h2 id="draft-h" className="text-[18px] font-semibold text-ink">
@@ -233,10 +239,14 @@ export function DealThread({
 
 function MessageCard({ message, brandName }: { message: Message; brandName: string }) {
   const outbound = message.direction === 'outbound_draft'
-  const date = new Date(message.created_at).toLocaleDateString('en-US', {
+  const sent = isSent(message)
+  const date = new Date(message.sent_at ?? message.created_at).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
   })
+  // An outbound draft the athlete never confirmed sending isn't labeled
+  // "Sent" — the app only knows what the athlete told it.
+  const when = !outbound ? `Pasted ${date}` : sent ? `Sent ${date}` : `Drafted ${date} · not marked sent`
   return (
     <article
       className={`flex flex-col gap-2 rounded-[14px] p-4 ${
@@ -245,9 +255,7 @@ function MessageCard({ message, brandName }: { message: Message; brandName: stri
     >
       <div className="flex items-center justify-between gap-2 text-[13px] text-muted">
         <strong className="text-ink">{outbound ? 'You' : brandName}</strong>
-        <span>
-          {outbound ? 'Sent' : 'Pasted'} {date}
-        </span>
+        <span>{when}</span>
       </div>
       {message.subject && <p className="text-[14px] font-semibold text-ink">{message.subject}</p>}
       <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-muted">{message.content}</p>
@@ -258,13 +266,29 @@ function MessageCard({ message, brandName }: { message: Message; brandName: stri
 // The "did you hear back?" clock only starts when markSent moves the deal to
 // `sent` (first outreach or a follow-up); a counter sent mid-negotiation
 // doesn't start it, so don't promise a check-in then.
-function SentMoment({ followUpClock }: { followUpClock: boolean }) {
+// `celebrate` is the moment right after "I sent it"; on a later visit the
+// same panel is the resting state, without the animation.
+function SentMoment({
+  brandName,
+  followUpClock,
+  celebrate,
+}: {
+  brandName: string
+  followUpClock: boolean
+  celebrate: boolean
+}) {
   return (
     <div className="flex flex-col items-center gap-3 py-8 text-center">
-      <span className="grid size-[72px] shrink-0 animate-pop place-items-center rounded-full bg-agreed-soft text-agreed">
+      <span
+        className={`grid size-[72px] shrink-0 place-items-center rounded-full bg-agreed-soft text-agreed ${
+          celebrate ? 'animate-pop' : ''
+        }`}
+      >
         <CheckIcon size={32} />
       </span>
-      <h2 className="display text-[32px]">Sent. Nice work.</h2>
+      <h2 id="draft-h" className="display text-[32px]">
+        {celebrate ? 'Sent. Nice work.' : `Sent. Waiting on ${brandName}.`}
+      </h2>
       <p className="max-w-sm text-[15px] leading-relaxed text-muted">
         {followUpClock &&
           `We'll check in on Home in ${FOLLOW_UP_DAYS} days if they haven't replied. `}
@@ -399,7 +423,7 @@ function DraftEditor({ dealId, draft, contactEmail, kind, pending, run, onSent }
           disabled={pending}
           onClick={() =>
             run(async () => {
-              const result = await markSent(dealId)
+              const result = await markSent(dealId, draft.id)
               if (!result?.error) onSent()
               return result
             })

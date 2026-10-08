@@ -41,7 +41,7 @@ at Vercel, Supabase, Inngest, Sentry, PostHog, Anthropic, and Tavily.
 1. supabase.com → **New project**. Pick a region near your users (e.g.
    `us-west-1` / `us-east-1`) and generate a strong database password. Save the
    password in your password manager, not in the repo.
-2. Apply every migration in `supabase/migrations/` (0001 → 0014 as of this writing, in order) from
+2. Apply every migration in `supabase/migrations/` (0001 → 0015 as of this writing, in order) from
    your laptop:
 
    ```bash
@@ -50,13 +50,13 @@ at Vercel, Supabase, Inngest, Sentry, PostHog, Anthropic, and Tavily.
    npx supabase db push                            # prompts for the database password
    ```
 
-   `db push` must list every file in `supabase/migrations/` (0001 through 0014) and finish without errors.
+   `db push` must list every file in `supabase/migrations/` (0001 through 0015) and finish without errors.
 3. Check it worked (**SQL Editor**):
 
    ```sql
    select count(*) from public.invite_codes;          -- 0, and no error
    select column_name from information_schema.columns
-    where table_name = 'discovery_runs' and column_name = 'focus';  -- 1 row (0013 applied)
+    where table_name = 'messages' and column_name = 'sent_at';  -- 1 row (0015 applied)
    ```
 
 4. Where the keys come from (**Project Settings → API Keys**, plus **Data API**
