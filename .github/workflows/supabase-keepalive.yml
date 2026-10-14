@@ -1,0 +1,46 @@
+name: Supabase keep-alive
+
+# Free-tier Supabase projects pause after 7 days with no API activity.
+# A real PostgREST query every 3 days keeps dev and prod awake.
+# Uses only the public anon/publishable keys (the same ones the browser ships).
+
+on:
+  schedule:
+    - cron: "17 14 */3 * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    name: Ping ${{ matrix.project }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - project: dev
+            url_secret: SUPABASE_DEV_URL
+            key_secret: SUPABASE_DEV_ANON_KEY
+          - project: prod
+            url_secret: SUPABASE_PROD_URL
+            key_secret: SUPABASE_PROD_ANON_KEY
+    steps:
+      - name: Query PostgREST
+        env:
+          SUPABASE_URL: ${{ secrets[matrix.url_secret] }}
+          SUPABASE_KEY: ${{ secrets[matrix.key_secret] }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
+            echo "::error::Missing ${{ matrix.url_secret }} or ${{ matrix.key_secret }} repo secret"
+            exit 1
+          fi
+          # Any non-5xx answer means the database handled the request.
+          # RLS may return an empty list or a permission error; both count.
+          status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 \
+            "$SUPABASE_URL/rest/v1/brands?select=id&limit=1" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY")
+          echo "HTTP $status"
+          if [ "$status" -ge 500 ] || [ "$status" = "000" ]; then
+            echo "::error::Supabase ${{ matrix.project }} did not respond (HTTP $status) — it may already be paused"
+            exit 1
+          fi
