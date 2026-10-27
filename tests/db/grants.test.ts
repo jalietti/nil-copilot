@@ -175,6 +175,13 @@ describe('anon', () => {
       /permission denied/,
     )
   })
+
+  it('can call keepalive(), which returns only the server clock', async () => {
+    const { rows } = await as(db, 'anon', null, (tx) =>
+      tx.query<{ fresh: boolean }>(`select keepalive() > now() - interval '1 minute' as fresh`),
+    )
+    expect(rows).toEqual([{ fresh: true }])
+  })
 })
 
 // Supabase advisor lint 0011: a function without a pinned search_path resolves

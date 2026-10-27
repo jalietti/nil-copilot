@@ -142,9 +142,17 @@ async function checkSupabase(ref: string) {
     const { error } = await admin.from(table as 'profiles').select(columns).limit(0)
     if (error) missing.push(`${table} (${error.message})`)
   }
-  pass('Database: all migrations applied (0001-0015)', missing.length === 0, `missing: ${missing.join('; ')} — run npm run pilot:db-push -- ${ref}`)
+  pass('Database: all migrations applied (0001-0016)', missing.length === 0, `missing: ${missing.join('; ')} — run npm run pilot:db-push -- ${ref}`)
 
   const anon = createClient<Database>(url, publishableKey, { auth: { persistSession: false } })
+  // Same call the scheduled keep-alive workflow makes. Plain fetch: keepalive()
+  // isn't in the typed Database (adding a Functions entry breaks embed inference).
+  const keepalive = await fetch(`${url}/rest/v1/rpc/keepalive`, {
+    method: 'POST',
+    headers: { apikey: publishableKey, 'Content-Type': 'application/json' },
+    body: '{}',
+  })
+  pass('Database: keep-alive ping succeeds (stops free-plan pausing)', keepalive.ok, `keepalive() returned HTTP ${keepalive.status} — run npm run pilot:db-push -- ${ref}`)
   const { error: anonError } = await anon.from('profiles').select('id').limit(1)
   pass('Database: signed-out visitors can read no athlete data', !!anonError && /permission denied/i.test(anonError.message), 'anon could query profiles')
 
