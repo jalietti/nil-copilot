@@ -1,12 +1,13 @@
 name: Supabase keep-alive
 
-# Free-tier Supabase projects pause after 7 days with no API activity.
-# A real PostgREST query every 3 days keeps dev and prod awake.
+# Free-plan Supabase projects pause after a week without enough user database
+# activity ("a few user requests each day"). A successful daily query keeps
+# dev and prod awake. keepalive() is migration 0016: it reads no tables.
 # Uses only the public anon/publishable keys (the same ones the browser ships).
 
 on:
   schedule:
-    - cron: "17 14 */3 * *"
+    - cron: "17 14 * * *"
   workflow_dispatch:
 
 jobs:
@@ -33,14 +34,15 @@ jobs:
             echo "::error::Missing ${{ matrix.url_secret }} or ${{ matrix.key_secret }} repo secret"
             exit 1
           fi
-          # Any non-5xx answer means the database handled the request.
-          # RLS may return an empty list or a permission error; both count.
+          # Must be a successful query: a permission error may not count as
+          # activity. curl's own failure (DNS, timeout) is reported as 000.
           status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 \
-            "$SUPABASE_URL/rest/v1/brands?select=id&limit=1" \
+            -X POST "$SUPABASE_URL/rest/v1/rpc/keepalive" \
             -H "apikey: $SUPABASE_KEY" \
-            -H "Authorization: Bearer $SUPABASE_KEY")
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            -H "Content-Type: application/json" -d '{}') || status=000
           echo "HTTP $status"
-          if [ "$status" -ge 500 ] || [ "$status" = "000" ]; then
-            echo "::error::Supabase ${{ matrix.project }} did not respond (HTTP $status) — it may already be paused"
+          if [ "$status" != "200" ]; then
+            echo "::error::Supabase ${{ matrix.project }} keep-alive failed (HTTP $status). 000/540 = paused or unreachable; 404 = migration 0016 not applied"
             exit 1
           fi
