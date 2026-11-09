@@ -23,8 +23,8 @@ Options considered for getting a draft to a brand:
 
 Option 2, permanently. The copilot drafts; the athlete is always the sender and
 final approver of everything outbound. There is no send-on-behalf path, no
-inbox read access, and Resend (our transactional email provider) is used only
-for platform email such as sign-up confirmation, never for outreach.
+inbox read access. Platform email (sign-up confirmation today, via Supabase
+Auth; match notifications later, via Resend) never carries outreach.
 
 Replies come back to the athlete's own inbox. To get a drafted counter-offer,
 the athlete pastes the brand's reply into the deal thread.
