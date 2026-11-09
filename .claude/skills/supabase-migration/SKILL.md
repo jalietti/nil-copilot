@@ -40,7 +40,7 @@ description: Use whenever a change needs anything new or different in supabase/m
 6. **Update every mirror of the schema:**
    - `src/lib/supabase/types.ts` (hand-authored — row type + `Database.public.Tables` entry, enums);
    - `scripts/pilot/verify-prod.ts` — add the new column to `expected` and bump the `0001-00NN` label;
-   - `PILOT-SETUP.md` — every mention of the previous latest migration number;
+   - `docs/operations/pilot-setup.md` — every mention of the previous latest migration number;
    - `supabase/seed.sql` — only if athletes see the new data on screen.
 7. **Run locally:** `npx supabase start` (if not running), `npm run db:reset`, `npm test`, `npm run test:rls`, `npm run lint`, `npm run build`. Run `npm run test:e2e` only if the change touches signup → onboarding → draft → reply.
 8. **Run the Definition of done** (below) before showing the owner anything.
@@ -80,7 +80,7 @@ Run every check, fix failures, run again. Report one line per check — pass/fai
 4. **App paths:** a `tests/db/grants.test.ts` case runs the app's real read/write as the athlete and passes — evidence: test name.
 5. **Types:** `src/lib/supabase/types.ts` has every new column/table/enum; `npm run build` passes — evidence: the diff lines + build exit status.
 6. **Prod check:** `verify-prod.ts` expects the new column and its label says the new number — evidence: the diff lines.
-7. **Setup doc:** `grep -n "00<previous>" PILOT-SETUP.md` returns nothing stale — evidence: grep output.
+7. **Setup doc:** `grep -n "00<previous>" docs/operations/pilot-setup.md` returns nothing stale — evidence: grep output.
 8. **Right database:** `supabase/.temp/project-ref` was read and named before any database command; no bare `db push` was run — evidence: the commands run this session.
 9. **Lint:** `npm run lint` exits 0 — evidence: exit status.
 10. **Seed (only if athletes see the data):** `supabase/seed.sql` covers it and `npm run db:reset` succeeds — evidence: exit status.

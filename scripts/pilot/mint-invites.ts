@@ -1,4 +1,4 @@
-// Mint invite codes in a hosted project (the SQL in PILOT-SETUP.md, as a
+// Mint invite codes in a hosted project (the SQL in docs/operations/pilot-setup.md, as a
 // command). Codes are random, easy to read aloud, and printed once.
 //
 //   npm run pilot:invites -- <project-ref>                       # 10 single-use codes
