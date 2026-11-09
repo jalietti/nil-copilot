@@ -39,7 +39,7 @@ Both, roughly equal weight:
 
 ### Who's been left out? Who benefits?
 **Left out:**
-- International student-athletes — concrete case: a Dutch teammate, financially struggling, has never considered NIL a real option because the marketplaces are confusing and he doesn't know how to self-market. **Important:** international athletes may also face real visa/immigration restrictions on accepting NIL income — a separate, higher-stakes issue from the state agent-registration question, and a hard requirement (not a nice-to-have) that onboarding ask citizenship/visa status early and give real guidance rather than silence.
+- International student-athletes — for example, international athletes I've talked to who have never considered NIL a real option, because the marketplaces are confusing and self-marketing doesn't come naturally. **Important:** international athletes may also face real visa/immigration restrictions on accepting NIL income — a separate, higher-stakes issue from the state agent-registration question, and a hard requirement (not a nice-to-have) that onboarding ask citizenship/visa status early and give real guidance rather than silence.
 - Athletes with small or no following yet, and anyone who doesn't see themselves as "marketable."
 
 **Who benefits when the problem exists (status quo):** NIL marketplaces profit from listing volume regardless of whether athletes actually land good deals. Athletes already winning under the current system face less competition for brand attention.
