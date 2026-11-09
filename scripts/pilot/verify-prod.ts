@@ -1,4 +1,4 @@
-// Automated production readiness check (PILOT-SETUP.md): the deployed app,
+// Automated production readiness check (docs/operations/pilot-setup.md): the deployed app,
 // its Supabase project, and the Inngest connection. Read-only.
 //
 //   npm run pilot:verify -- --url https://your-app.vercel.app --project-ref <prod-ref>
@@ -111,7 +111,7 @@ async function checkSupabase(ref: string) {
     await fetch(`${url}/auth/v1/settings`, { headers: { apikey: publishableKey } })
   ).json()) as { mailer_autoconfirm?: boolean; disable_signup?: boolean; external?: Record<string, boolean> }
   // The pilot runs with confirmation on through a custom SMTP sender
-  // (PILOT-SETUP.md step 3); the app handles either setting.
+  // (docs/operations/pilot-setup.md step 3); the app handles either setting.
   record(
     'PASS',
     settings.mailer_autoconfirm === false
